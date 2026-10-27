@@ -1,7 +1,11 @@
-node_modules
-dist
+*.p12
+*.xcodeproj/
 .DS_Store
-.env
-
-# Ignore the output video from Git but not videos you import into src/.
-out
+.build/
+.signing/
+.swiftpm/
+/build/
+DerivedData/
+build/
+dist/
+xcuserdata/

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>Hark</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.hark.Hark</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Hark</string>
+    <key>CFBundleDisplayName</key>
+    <string>Hark</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Hark listens only while you hold ⌥⌘ (or ⌃⌥ to dictate) and transcribes on this Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Hark can use Apple's on-device recognizer for your accent. Audio never leaves your Mac.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Hark controls apps like Chrome, Safari, and Terminal when you ask it to.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>dev.hark.Hark</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>hark</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT License</string>
+</dict>
+</plist>
