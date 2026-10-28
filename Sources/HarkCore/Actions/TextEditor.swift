@@ -66,6 +66,23 @@ public final class TextEditor {
         return read(element)
     }
 
+    /// What kind of field has focus: a spreadsheet cell, a one-line box (search, address bar, form, terminal), or a
+    /// text area (a message, note, document, chat box). Speech is read differently in each: a cell rarely wants a sentence.
+    public static func fieldKind() -> SpeechIntent.FieldKind {
+        guard let app = AX.frontmostApp(), let focused = AX.value(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute) else { return .none }
+        let element = focused as! AXUIElement // swiftlint:disable:this force_cast
+        guard isEditable(element) else { return .none }
+        let name = app.localizedName ?? ""
+        if ["Numbers", "Microsoft Excel", "LibreOffice"].contains(name) { return .cell }
+        let title = AX.focusedWindow(app).flatMap { AX.string($0, kAXTitleAttribute) } ?? ""
+        if title.range(of: #"(?:Google Sheets|Excel|Numbers|Airtable|Smartsheet)\b"#, options: .regularExpression) != nil { return .cell }
+        if ["Terminal", "iTerm2", "Warp", "Ghostty", "Alacritty", "kitty", "Hyper"].contains(name) { return .singleLine }
+        let role = AX.string(element, kAXRoleAttribute) ?? ""
+        let subrole = AX.string(element, kAXSubroleAttribute) ?? ""
+        if ["AXTextField", "AXSearchField", "AXComboBox"].contains(role) || subrole == "AXSearchField" { return .singleLine }
+        return .area
+    }
+
     /// True when a text field has focus — speech about text then goes to the writing model.
     public static func isEditing() -> Bool {
         guard let focused = AX.value(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute) else { return false }
@@ -303,27 +320,52 @@ public final class TextEditor {
             try await Keyboard.type(typed)
             return typed
         }
-        // Web editors: key events, checked — one that didn't land is typed once more.
+        // Web editors: key events, checked. Only a field that has shown typing before gets a phrase typed again —
+        // others (a spreadsheet cell's hidden editor, a code editor) don't report their text, and retyping would double it.
+        let reliable = Self.reflectsTyping.contains { CFEqual($0, field.element) }
         for attempt in 0..<2 {
             try Keyboard.typeLines(typed)
-            if await Self.waitFor(field.element, { $0.text != field.text }) != nil { break }
-            Log.info("Typing didn't show up in the field\(attempt == 0 ? "; typing it again" : "")")
+            if await Self.waitFor(field.element, { $0.text != field.text }) != nil {
+                if !reliable { Self.reflectsTyping = Array(([field.element] + Self.reflectsTyping).prefix(8)) }
+                break
+            }
+            guard reliable, attempt == 0 else {
+                Log.info("Typed into a field that doesn't show its text; not checking it")
+                break
+            }
+            Log.info("Typing didn't show up in the field; typing it again")
         }
         return typed
     }
+
+    /// Fields whose Accessibility text has changed as Hark typed: there, a phrase that didn't show up can be retyped.
+    static var reflectsTyping: [AXUIElement] = []
 
     /// Replaces the `count` characters before the caret with `text` by keys: ⇧← over them, then type over the
     /// selection in one step (⌫ only when `text` is empty) — never delete first, so typing that doesn't land loses
     /// nothing. For web editors, where an Accessibility selection lands late, at the wrong offset, and blocks pastes.
     /// If the change doesn't show, call `collapseSelection` so nothing stays selected.
-    public func retypeBeforeCaret(_ count: Int, with text: String) async throws {
+    /// `expecting`: what the selection must be before it's replaced; if the field shows something else, nothing is
+    /// changed (the selection is dropped) and this returns false.
+    @discardableResult
+    public func retypeBeforeCaret(_ count: Int, expecting old: String? = nil, with text: String) async throws -> Bool {
         await keyboardGate()
-        for _ in 0..<count { try Keyboard.press(KeyCombo(key: "left", shift: true)) }
+        for _ in 0..<count { try Keyboard.press(KeyCombo(key: "left", shift: true), quick: true) }
+        if let old, count > 0, let element = Self.capture()?.element {
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            if let selected = AX.string(element, kAXSelectedTextAttribute), !selected.isEmpty,
+               !Self.sameText(selected.replacingOccurrences(of: "\r", with: "\n"), old) {
+                Log.info("Retype: selected “\(Self.short(selected))”, expected “\(Self.short(old))”; leaving it")
+                try Keyboard.press(KeyCombo(key: "right"))
+                return false
+            }
+        }
         if !text.isEmpty {
             try Keyboard.typeLines(text)
         } else if count > 0 {
             try Keyboard.press(KeyCombo(key: "delete"))
         }
+        return true
     }
 
     /// After a change that didn't take: the caret back at the end of the selection it left, the text untouched.
@@ -425,6 +467,16 @@ public final class TextEditor {
         guard AXUIElementSetAttributeValue(field.element, kAXSelectedTextAttribute as CFString, text as CFString) == .success else { return false }
         if let before, let after = AX.string(field.element, kAXValueAttribute) { return after != before || (text.isEmpty && field.selection.length == 0) }
         return true
+    }
+
+    /// The last character before the caret that isn't a space ("\n" for a fresh line); `.some(nil)` at the start of the
+    /// field. A web editor's caret count runs short, so there the end of the text is used when the caret is near it.
+    public static func characterBeforeCaret(_ field: TextField) -> Character?? {
+        let ns = field.text as NSString
+        let caret = isWebField() && caretNearEnd(field) ? ns.length : min(field.selection.location, ns.length)
+        let before = ns.substring(to: caret)
+        guard let last = before.last(where: { $0 != " " && $0 != "\u{00A0}" && $0 != "\t" }) else { return .some(nil) }
+        return .some(last)
     }
 
     static func character(before field: TextField) -> Character? {

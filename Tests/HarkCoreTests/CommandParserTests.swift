@@ -182,20 +182,21 @@ final class ContinuousTypingTests: XCTestCase {
     }
 
     func testWhileWritingWhatAPhraseIs() {
+        let writing = SpeechIntent.Context(kind: .area, dictating: true, recentText: "Hello there.")
         XCTAssertNil(CommandParser.plainText("see you at six"), "without writing mode, words alone aren't typed instantly")
-        XCTAssertEqual(CommandParser.writingKind("see you at six"), .words("see you at six"))
-        XCTAssertEqual(CommandParser.writingKind("this is great"), .words("this is great"), "only “type this …” drops “this”")
-        XCTAssertEqual(CommandParser.writingKind("type this is great"), .words("is great"))
-        XCTAssertEqual(CommandParser.writingKind("Also make sure your recharge is"), .words("Also make sure your recharge is"))
-        XCTAssertEqual(CommandParser.writingKind("Next line"), .words("\n"), "line breaks are typed instantly too")
-        XCTAssertEqual(CommandParser.writingKind("New paragraph"), .words("\n\n"))
-        XCTAssertEqual(CommandParser.writingKind("the next line of the poem"), .words("the next line of the poem"), "the pass decides mid-sentence")
-        XCTAssertEqual(CommandParser.writingKind("put that in brackets"), .aboutText)
-        XCTAssertEqual(CommandParser.writingKind("scratch that"), .aboutText)
-        XCTAssertEqual(CommandParser.writingKind("type put on your shoes"), .words("put on your shoes"), "after “type” it's text")
-        XCTAssertEqual(CommandParser.writingKind("make it bold"), .edit)
-        XCTAssertEqual(CommandParser.writingKind("type heading as Introduction"), .edit)
-        XCTAssertEqual(CommandParser.writingKind("type hello and press enter"), .edit)
+        XCTAssertEqual(SpeechIntent.classify("see you at six", in: writing), .words("See you at six", then: nil))
+        XCTAssertEqual(SpeechIntent.classify("type this is great", in: writing), .words("This is great", then: nil), "“this” stays")
+        XCTAssertEqual(SpeechIntent.classify("type here: hello", in: writing), .words("Hello", then: nil))
+        XCTAssertEqual(SpeechIntent.classify("Also make sure your recharge is", in: writing), .hold, "ends mid-sentence: waits for the rest")
+        XCTAssertEqual(SpeechIntent.classify("Next line", in: writing), .punctuation("\n"), "line breaks are typed instantly too")
+        XCTAssertEqual(SpeechIntent.classify("New paragraph", in: writing), .punctuation("\n\n"))
+        XCTAssertEqual(SpeechIntent.classify("the next line of the poem", in: writing), .words("The next line of the poem", then: nil))
+        XCTAssertEqual(SpeechIntent.classify("put that in brackets", in: writing), .edit)
+        XCTAssertEqual(SpeechIntent.classify("scratch that", in: writing), .edit)
+        XCTAssertEqual(SpeechIntent.classify("type put on your shoes", in: writing), .words("Put on your shoes", then: nil), "after “type” it's text")
+        XCTAssertEqual(SpeechIntent.classify("make it bold", in: writing), .edit)
+        XCTAssertEqual(SpeechIntent.classify("type heading as Introduction", in: writing), .edit)
+        XCTAssertEqual(SpeechIntent.classify("type hello and press enter", in: writing), .words("Hello", then: "press enter"))
     }
 
     func testSessionTextMustStillBeRightBeforeTheCaret() {
@@ -497,5 +498,47 @@ final class MCPServerTests: XCTestCase {
         let server = MCPServer()
         let first = server.configJSON
         for _ in 0..<50 { XCTAssertEqual(server.configJSON, first) }
+    }
+}
+
+final class RunEffortTests: XCTestCase {
+    func testLongButStraightforwardIsNotWorthAsking() {
+        var effort = RunEffort()
+        for row in 1...25 {
+            effort.acted("type_text", ["text": "row \(row)"])
+            effort.acted("press_keys", ["keys": "return"])
+        }
+        effort.looked()
+        XCTAssertFalse(effort.worthAsking, effort.summary)
+    }
+
+    func testTonightsSheetsRunIsWorthAsking() {
+        // From the log: cells clicked and the same rows typed again until the keyboard way worked.
+        var effort = RunEffort()
+        effort.acted("click_at", ["x": "93", "y": "333"]); effort.looked()
+        effort.acted("type_text", ["text": "Aarav Sharma\taarav.sharma@example.com"]); effort.looked()
+        effort.acted("type_text", ["text": "Aarav Sharma\taarav.sharma@example.com"]); effort.looked()
+        effort.acted("press_keys", ["keys": "escape"])
+        effort.acted("press_keys", ["keys": "cmd+up"]); effort.acted("press_keys", ["keys": "cmd+left"])
+        effort.acted("type_text", ["text": "Name\tEmail"]); effort.looked()
+        XCTAssertTrue(effort.worthAsking)
+        XCTAssertEqual(effort.redos, 1)
+        XCTAssertEqual(effort.backtracks, 1)
+    }
+
+    func testLookingAroundToFigureItOutIsWorthAsking() {
+        var effort = RunEffort()
+        effort.looked(); effort.acted("click", ["label": "View"]); effort.looked()
+        effort.acted("click", ["label": "Show Sidebar"]); effort.looked()
+        effort.acted("click", ["label": "Settings"]); effort.looked()
+        XCTAssertTrue(effort.worthAsking, "no step failed, but it took finding")
+    }
+
+    func testQuickTaskIsNotWorthAsking() {
+        var effort = RunEffort()
+        effort.acted("menu", ["path": "Apple > About This Mac"]); effort.looked()
+        XCTAssertFalse(effort.worthAsking)
+        effort.failed()
+        XCTAssertTrue(effort.worthAsking, "a failed step that then worked")
     }
 }

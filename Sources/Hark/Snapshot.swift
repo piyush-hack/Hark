@@ -40,10 +40,16 @@ enum Snapshot {
                                          confirmation: "Run this command? rm -rf ./build") }),
             ("dictation", { engine.preview(phase: .listening, mode: .dictation, transcript: "Hey Priya, running ten minutes late — start without me.", level: 0.5) }),
         ]
-        for (name, apply) in states + [("minimized", { engine.preview(phase: .thinking, transcript: "Apply to five jobs") })] {
+        let minimized: [(String, () -> Void)] = [
+            ("minimized", { engine.preview(phase: .thinking, transcript: "Apply to five jobs") }),
+            ("minimized-working", { engine.preview(phase: .working, transcript: "Apply to five jobs",
+                                                   steps: [Step(title: "Open LinkedIn Jobs", status: .done),
+                                                           Step(title: "Click “Easy Apply” on the Product Designer role", status: .running)]) }),
+        ]
+        for (name, apply) in states + minimized {
             apply()
             let layout = HUDLayout()
-            layout.preview(minimized: name == "minimized")
+            layout.preview(minimized: name.hasPrefix("minimized"))
             let island = ZStack(alignment: .top) {
                 LinearGradient(colors: [Color(red: 0.16, green: 0.24, blue: 0.36), Color(red: 0.45, green: 0.38, blue: 0.42)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)

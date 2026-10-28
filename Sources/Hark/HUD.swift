@@ -332,6 +332,8 @@ struct HUDView: View {
         if !engine.transcript.isEmpty { return engine.transcript }
         if engine.phase == .listening {
             if engine.mode == .dictation { return "Speak — I'll type it" }
+            // Hands-free between requests: what was just done, not a standing "I'm listening".
+            if engine.handsFree, !engine.nowDoing.isEmpty { return engine.nowDoing }
             return engine.handsFree ? "I'm listening — just talk, I'll act as you go." : "Go ahead, I'm listening…"
         }
         return engine.reply
@@ -403,18 +405,30 @@ struct HUDView: View {
             .onEnded { _ in layout.onDrag(true) }
     }
 
-    /// Minimized: just the orb, what Hark is doing, and a dot when it needs you.
+    /// What the pill says: the step Hark is on, what it's hearing, or else what it last did — never how to use it.
+    /// One line: line breaks become spaces.
+    private var pillText: String {
+        pillSource.replacingOccurrences(of: "\n", with: " ")
+    }
+
+    private var pillSource: String {
+        if let prompt = engine.confirmationPrompt { return prompt }
+        if engine.isBusy || [.thinking, .working].contains(engine.phase),
+           let now = engine.steps.last?.title ?? (engine.transcript.isEmpty ? nil : engine.transcript) { return now }
+        if !engine.transcript.isEmpty { return engine.transcript }
+        if !engine.nowDoing.isEmpty { return engine.nowDoing }
+        return engine.phase == .listening ? "Listening" : statusLabel
+    }
+
+    /// Minimized: the orb (it shows listening and thinking) and what Hark is doing.
     private var pill: some View {
         HStack(spacing: 8) {
             LiveOrb(meter: engine.meter, mood: engine.phase.mood, size: 22)
-            Text(statusLabel)
+            Text(pillText.count > 46 ? pillText.prefix(45).trimmingCharacters(in: .whitespaces) + "…" : pillText)
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
                 .fixedSize()
-            if [.transcribing, .thinking, .working].contains(engine.phase) || (engine.handsFree && engine.isBusy) {
-                ProgressView().controlSize(.mini).tint(.white)
-            }
             smallButton("arrow.up.left.and.arrow.down.right", help: "Expand") { layout.setMinimized(false) }
         }
         .padding(.leading, 8)

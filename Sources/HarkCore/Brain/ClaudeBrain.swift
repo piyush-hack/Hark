@@ -114,7 +114,7 @@ public final class ClaudeBrain {
         let note = screen.images.isEmpty ? "\n\n(No screenshot: Screen Recording isn't allowed for Hark.)" : ""
         content.append(["type": "text", "text": "[Context]\n\(context)\n\n[Request]\n\(request)\(note)"])
         let started = Date()
-        let answer = try await currentSession().ask(content: content)
+        let answer = try await currentSession().ask(content: content, keepOpen: true)
         Log.info(String(format: "Claude (%@) finished in %.1fs", model, Date().timeIntervalSince(started)))
         return answer.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -129,7 +129,12 @@ public final class ClaudeBrain {
     public func followUp(_ text: String) async throws {
         // Same session that did the task, never a fresh one — it has to remember what just happened.
         guard let session else { return }
-        _ = try await session.ask(content: [["type": "text", "text": text]])
+        _ = try await session.ask(content: [["type": "text", "text": text]], followUp: true)
+    }
+
+    /// The request is over, with no follow-up: a used-up session starts its successor now, so the next request is warm.
+    public func finish() async {
+        await session?.restartIfUsedUp()
     }
 
     /// Stops whatever Claude is doing (the island's Stop); the next request starts a fresh session.

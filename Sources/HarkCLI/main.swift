@@ -54,7 +54,8 @@ case "transcribe":
         let samples = try loadSamples(path)
         let start = Date()
         let words = try await Transcriber.shared.transcribe(samples)
-        print(String(format: "[%.2fs] %@", Date().timeIntervalSince(start), words))
+        let confidence = await Transcriber.shared.lastConfidence
+        print(String(format: "[%.2fs] (%.2f) %@", Date().timeIntervalSince(start), confidence, words))
     }
 
 case "listen":

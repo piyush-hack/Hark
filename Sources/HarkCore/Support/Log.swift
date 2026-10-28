@@ -12,8 +12,12 @@ public enum Log {
         return f
     }()
 
+    /// Off under unit tests, so test runs never write into the app's log.
+    public static var writesFile = NSClassFromString("XCTestCase") == nil
+
     /// Plain-text log at ~/Library/Application Support/Hark/hark.log (rotated at 2 MB) for bug reports.
     private static func append(_ line: String) {
+        guard writesFile else { return }
         let url = Paths.appSupport.appendingPathComponent("hark.log")
         let entry = "\(stamp.string(from: Date())) \(line)\n"
         fileQueue.async {

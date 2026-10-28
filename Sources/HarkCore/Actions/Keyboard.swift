@@ -21,7 +21,8 @@ public enum Keyboard {
         "f7": kVK_F7, "f8": kVK_F8, "f9": kVK_F9, "f10": kVK_F10, "f11": kVK_F11, "f12": kVK_F12,
     ]
 
-    public static func press(_ combo: KeyCombo) throws {
+    /// `quick`: shorter gaps, for long runs of the same key (⇧← over a phrase).
+    public static func press(_ combo: KeyCombo, quick: Bool = false) throws {
         guard let code = keyCodes[combo.key] else { throw HarkError("I don't know the key “\(combo.key)”.") }
         var flags: CGEventFlags = []
         if combo.command { flags.insert(.maskCommand) }
@@ -36,9 +37,9 @@ public enum Keyboard {
         down.flags = flags
         up.flags = flags
         down.post(tap: .cghidEventTap)
-        usleep(8_000)
+        usleep(quick ? 3_000 : 8_000)
         up.post(tap: .cghidEventTap)
-        usleep(12_000)
+        usleep(quick ? 5_000 : 12_000)
     }
 
     /// Shift pressed and released on its own: changes nothing, but it's keyboard input — Chrome ignores ⌘V after

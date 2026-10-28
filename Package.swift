@@ -22,6 +22,6 @@ let package = Package(
         ),
         .executableTarget(name: "Hark", dependencies: ["HarkCore"]),
         .executableTarget(name: "HarkCLI", dependencies: ["HarkCore"]),
-        .testTarget(name: "HarkCoreTests", dependencies: ["HarkCore"]),
+        .testTarget(name: "HarkCoreTests", dependencies: ["HarkCore"], resources: [.copy("Fixtures")]),
     ]
 )

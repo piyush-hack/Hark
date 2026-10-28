@@ -17,7 +17,7 @@ BIN="$(swift build -c "$CONFIG" --show-bin-path)"
 
 [ -f Resources/AppIcon.icns ] || swift scripts/make-icon.swift Resources/AppIcon.icns
 
-echo "→ Assembling $APP…"
+echo "→ Assembling ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Hark" "$APP/Contents/MacOS/Hark"

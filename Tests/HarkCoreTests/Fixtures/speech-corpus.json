@@ -1,0 +1,3242 @@
+[
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Create a header in this Google Sheet with name, email, phone number",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: imperative to the assistant that names the sheet as an object. Typed into A1 tonight; must route to the model, never to the keyboard."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "fill in hundred sample data",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: disfluent imperative asking the assistant to populate the sheet. No typing verb, so it is not dictation."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "fill in 25 sample rows",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: request for the assistant to generate rows. Follows a sheet command, which reinforces command context."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "clear this sheet",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: treats the sheet as an object; explicitly listed under command. Destructive, so the model must handle it, not the typer."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "look at this screen",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: reference to the screen addressed to the assistant; listed command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "here can you give a header or name, email, phone number",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: 'can you' request to the assistant despite the garbled STT. Was typed into the sheet tonight; must never be again."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "type name",
+  "phrase": "it did not type",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Complaint addressed to the assistant about its own behaviour (R2 list). dictating=false because nothing landed in the cell."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "type Akash Goyal",
+  "phrase": "nothing is typing",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Status complaint to the assistant, explicitly listed as command. Typing it into the cell would be the worst outcome."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "go to cell B2",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Absolute navigation to a named cell; listed command (contrast relative cursor moves like 'go to the next row', which are edits)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "sum this column",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: references the column as an object and asks the assistant to compute; listed command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "download this sheet",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: app/UI action on the sheet; listed command."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "search for best ramen in Tokyo",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'search for X' is a listed command even with a search box focused; the model decides how to run the search. Contrast 'type best ramen in Tokyo' (type) and bare 'best ramen in Tokyo' (ask_first)."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "go to github.com",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Navigation request to the assistant; listed command. Not a typing verb, so R3 does not apply."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "add a column for city after phone number",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: structural change to the sheet addressed to the assistant; needs the model to locate the phone number column."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "freeze the first row",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: sheet/UI operation (View menu), not text manipulation; command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "sort this column A to Z",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: sheet operation on 'this column'; command, not an edit of text at the caret."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "what's the total of column C",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: question addressed to the assistant about the sheet; command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "put a formula here that adds B2 to B10",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: asks the assistant to compose and enter a formula (non-verbatim content); the model writes =SUM(B2:B10). Not dictation."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "delete the empty rows",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Although 'delete' appears in the edit list, this needs the assistant to inspect the sheet and find empty rows; it is a sheet task, not a caret-level edit. Command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, what's in cell D5",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Vocative 'Hark' plus a question about a cell; R1 command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open Excel",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: open an app; listed command regardless of the focused cell."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "scroll down",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: UI action; listed command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "click on the share button",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: click a UI button; listed command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "can you check whether the emails in column B are valid",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: 'can you' request referencing a column; the assistant must read the screen. Command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "fill in 25 sample rows",
+  "phrase": "fill the rest with dummy data",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: imperative to generate content for the sheet, continuing a command conversation. Command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "copy this whole table to a new sheet",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'copy' is in the edit list, but this is a multi-step sheet operation (select table, create sheet, paste) that needs the model, not a caret-level copy. Command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "what did you type",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: question addressed to the assistant about what it typed; listed command. Must not land in the cell."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "you typed the wrong thing",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: complaint addressed to the assistant; listed command even mid-dictation."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open youtube",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: open a site; command. The model navigates rather than typing 'open youtube' into the bar."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "go to my gmail",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: navigation request; command."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "look up the weather in Bangalore",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: imperative to the assistant ('look up'); command. The model may run the search itself."
+ },
+ {
+  "app": "Finder search",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "find the PDF I downloaded yesterday",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: task for the assistant that needs reasoning about dates and file types; command, not a literal search string."
+ },
+ {
+  "app": "Spotlight",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open Terminal",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: open an app; command (the model may use Spotlight to do it, but the phrase itself is not dictation)."
+ },
+ {
+  "app": "Login form (Safari)",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "log me in with my Google account",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: request to the assistant to drive the login flow; command. Never typed into the username field."
+ },
+ {
+  "app": "Login form (Safari)",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "click sign in",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: click a button; listed command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "what time is it in Tokyo",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Question addressed to the assistant; listed command. A cell never wants this sentence."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "which MCP servers do you have",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Question to the assistant about itself; listed command."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "insert a chart for this data",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: app operation referencing 'this data'; command."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "convert this column to currency format",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: formatting operation on a column via the app's UI; command (not a text edit at the caret)."
+ },
+ {
+  "app": "Numbers",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "add a row at the bottom with the totals",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: asks the assistant to compute and insert; command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "fill in 25 sample rows",
+  "phrase": "Hark, how many rows did you fill",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Vocative 'Hark' plus a question about the assistant's own work; command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "why is it typing in the cell, I asked you to make a header",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: complaint addressed to the assistant about where it typed (same family as 'you typed the wrong thing'). The model must stop, undo and do the header. Typing this sentence into the cell would be the worst possible outcome."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "fill in hundred sample data",
+  "phrase": "no no not in the cell",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: correction addressed to the assistant that references the cell as an object. The model should halt and recover; never typed."
+ },
+ {
+  "app": "Login form (Safari)",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "fill in my email address",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: asks the assistant to supply a value it must look up; command, not literal dictation of the words."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, type name",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Starts with the vocative 'Hark', so it is addressed to the assistant (R1/R2) rather than a bare R3 typing verb; the model will type 'name' into the focused cell. Consistent rule: any 'Hark, ...' is command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type 12500",
+  "phrase": "now total this column",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: references the column as an object and asks for computation, even though a dictation session is open."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "autofill this column down to row 50",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: sheet operation addressed to the assistant; command."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": true,
+  "prior": "type best ramen in Tokyo",
+  "phrase": "now search",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: treats the search UI as an object (like 'send it'); the assistant submits the search. Not punctuation, not an exact key name like 'press enter'."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, clear the sheet then add a header with name and email",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R5 multi-intent: clear first, then create the header. Both steps are commands and no edit step is present, so command; rationale carries the second step."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "command z",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Key press / undo is explicitly under edit, not command, even though it is said to the assistant. Hark typed the previous phrase into the cell, so the session is open and this reverts it."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "command z",
+  "phrase": "command z, command z",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Two undo key presses; edit. Never typed as the words 'command z'."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "command z",
+  "phrase": "command z again",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Repeated undo; edit (key press)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "fill in 25 sample rows",
+  "phrase": "undo that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Undo is listed under edit; reverts the wrongly typed command text."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "press enter",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Explicit key press; listed edit. Commits the cell and moves down."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "next cell",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Cursor move = single key press (Tab); edit, not type. Compare 'go to cell B2' (absolute navigation) which is command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type 12500",
+  "phrase": "go to the next row",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Relative cursor move (Enter/Down), like 'go to the end'; edit."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "delete that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R2 exception: explicit edit instruction on the just-typed text. Contrast 'type delete that' (R3, type)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type pending",
+  "phrase": "scratch that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Listed correction phrase; removes the last dictated chunk."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type akash goyal",
+  "phrase": "capitalize that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Listed correction; select and re-case the last chunk."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type total and then press enter",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R3 exception / R5: typing verb followed by an explicit key press, so a multi-step edit (type 'total', then Enter). Not plain type."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "paste the link I copied",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Paste is a listed edit (Cmd+V); not dictation of the words."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "make the header row bold",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Bold is a listed edit (select row 1, Cmd+B); exact steps, not free-form command. Must not be typed."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type draft",
+  "phrase": "put that in brackets",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Listed correction on the just-typed word; edit producing (draft)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal Sharma",
+  "phrase": "delete the last word",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Explicit delete instruction with a target; edit."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "undo that",
+  "phrase": "redo",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Redo is listed under edit (Cmd+Shift+Z). One word, but an exact edit verb, not a filler."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type name",
+  "expected": "type",
+  "rendered": "name",
+  "rationale": "R3: typing verb, rest is verbatim. Genuine cell dictation."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type five thousand",
+  "expected": "type",
+  "rendered": "five thousand",
+  "rationale": "R3 verbatim. Only the enumerated punctuation words are transformed; no number normalization in the policy, so the words land as heard (Parakeet usually emits digits anyway, see 'type 12500')."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type 12500",
+  "expected": "type",
+  "rendered": "12500",
+  "rationale": "R3: STT already emitted digits; typed verbatim into the cell."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type Akash Goyal",
+  "expected": "type",
+  "rendered": "Akash Goyal",
+  "rationale": "R3: typing verb plus a name; verbatim. Contrast bare 'Akash Goyal' (ask_first)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type name comma email comma phone number",
+  "expected": "type",
+  "rendered": "name, email, phone number",
+  "rationale": "R3 with spoken punctuation rendered: 'comma' becomes ',' with a following space."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type open bracket draft close bracket",
+  "expected": "type",
+  "rendered": "(draft)",
+  "rationale": "R3; 'open bracket'/'close bracket' are punctuation, never commands. No spaces inside the brackets."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type all caps total",
+  "expected": "type",
+  "rendered": "TOTAL",
+  "rationale": "R3; 'all caps X' renders X upper-cased."
+ },
+ {
+  "app": "Numbers",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "write down pending",
+  "expected": "type",
+  "rendered": "pending",
+  "rationale": "R3: 'write down' is a typing verb; rest verbatim."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash",
+  "phrase": "Goyal",
+  "expected": "type",
+  "rendered": "Goyal",
+  "rationale": "R2 default: dictation session open, plain continuation word. Rendered has no leading space; the engine inserts the join space (convention for all continuation items)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type quarterly revenue",
+  "phrase": "for the northern region",
+  "expected": "type",
+  "rendered": "for the northern region",
+  "rationale": "R2 default: declarative continuation in an open session; type. Join space handled by the engine."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type best ramen in Tokyo",
+  "expected": "type",
+  "rendered": "best ramen in Tokyo",
+  "rationale": "R3: explicit typing verb makes a search box dictation unambiguous; verbatim. Contrast 'search for best ramen in Tokyo' (command)."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type github.com",
+  "expected": "type",
+  "rendered": "github.com",
+  "rationale": "R3: typing verb; the URL lands verbatim. Contrast 'go to github.com' (command)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type delete that",
+  "expected": "type",
+  "rendered": "delete that",
+  "rationale": "R3: the typing verb wins even over edit words; the user wants the literal text 'delete that' in the cell."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Q3",
+  "phrase": "forecast question mark",
+  "expected": "type",
+  "rendered": "forecast?",
+  "rationale": "R2 default continuation with trailing spoken punctuation rendered; 'question mark' becomes '?' attached to the word."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "dictate not applicable",
+  "expected": "type",
+  "rendered": "not applicable",
+  "rationale": "R3: 'dictate' is a typing verb; rest verbatim."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type note",
+  "phrase": "please call the client tomorrow",
+  "expected": "type",
+  "rendered": "please call the client tomorrow",
+  "rationale": "R2 default: an imperative addressed to the message's recipient (the note's reader), not to Hark; typed as content while the session is open."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "comma",
+  "expected": "punctuation",
+  "rendered": ",",
+  "rationale": "Punctuation-only phrase in an open session; insert the symbol."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type line one",
+  "phrase": "new line",
+  "expected": "punctuation",
+  "rendered": "\n",
+  "rationale": "Break-only phrase; a line break inside the cell (engine chooses Option+Enter for Sheets)."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type pending approval",
+  "phrase": "full stop",
+  "expected": "punctuation",
+  "rendered": ".",
+  "rationale": "Punctuation-only phrase; insert '.' with no leading space."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": true,
+  "prior": "type best ramen in Tokyo",
+  "phrase": "question mark",
+  "expected": "punctuation",
+  "rendered": "?",
+  "rationale": "Punctuation-only phrase in an open search-box session; insert '?'."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type open bracket draft",
+  "phrase": "close bracket",
+  "expected": "punctuation",
+  "rendered": ")",
+  "rationale": "'close bracket' is punctuation, not a command (R2 note); insert ')' directly after 'draft'."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "fill in 25 sample rows",
+  "phrase": "don't fucking type",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Listed stop phrase. Hark had wrongly typed the previous command into the cell; this must end dictation immediately, never land as text."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "fill in hundred sample data",
+  "phrase": "stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Bare stop word in an open session; end dictation."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "Create a header in this Google Sheet with name, email, phone number",
+  "phrase": "stop typing",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Listed stop phrase; ends the session."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "type Akash Goyal",
+  "phrase": "that's enough",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Listed stop phrase; closes an otherwise legitimate dictation."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "fill this column with sample numbers",
+  "phrase": "cancel",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Listed stop word; aborts whatever Hark is doing for the previous command."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "stop listening",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Listed stop phrase; stops Hark entirely."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "clear this sheet",
+  "phrase": "stop stop stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Repeated stop word from an angry user; stop, not type and not command."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": true,
+  "prior": "type best ramen in Tokyo",
+  "phrase": "no stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "'no' + 'stop' is still a stop phrase, not search content; end the session."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I hope the meeting went well",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: declarative sentence with a cell focused and no session open; a cell rarely wants a sentence, so consult the model before typing."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "most of the time the text doesn't show up",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: declarative content in a cell with dictating=false; probably the user talking to the assistant. Never type immediately."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "the client said they will pay next week",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: could be a note for the cell or side talk; cell + no typing verb + no session means ask first."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "best ramen in Tokyo",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Bare content with no typing verb and no session in a single-line field; plausible search but ambiguous, so R1 says consult the model rather than type blindly."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Akash Goyal",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Bare name in a cell with dictating=false; could be dictation or a reference to a person. R1: ask first. Contrast 'type Akash Goyal' (type)."
+ },
+ {
+  "app": "Login form (Safari)",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "my password is tiger 123",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Declarative sentence in a single-line field; must never type credentials blindly (and never the literal words 'my password is'). Model confirms what, if anything, to enter."
+ },
+ {
+  "app": "Excel",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "revenue went up by twelve percent this quarter",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: declarative sentence with a cell focused and no session; ask before typing."
+ },
+ {
+  "app": "Chrome URL bar",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I think the link was in the email",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: declarative, single-line field, no typing verb; the user is probably thinking aloud to the assistant. Ask first."
+ },
+ {
+  "app": "Numbers",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "we need around fifty units for the Pune office",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: declarative content in a cell with no session open; ambiguous between a note and side talk."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Even though I",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: 3-word sentence start cut off by a pause; not a command, not a filler. Wait and join to the next phrase."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "What we need to",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: cut-off sentence start (4 words); hold for the continuation."
+ },
+ {
+  "app": "Numbers",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "So the thing is",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: short fragment that clearly continues; hold."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "uh",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "R4: filler; drop it."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "mm-hmm",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "R4: backchannel filler; ignore."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "okay okay",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "R4: filler acknowledgement, not search content; ignore."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hey Priya, quick one before the weekend.",
+  "phrase": "Create a plan for Monday and share it with the team by noon.",
+  "expected": "type",
+  "rendered": "Create a plan for Monday and share it with the team by noon.",
+  "rationale": "R2: dictation session open and the imperative is aimed at Priya, the recipient; nothing references the screen, app or assistant. Running it as a command would hijack a half-written message. Paired with the dictating=false Notes item (command)."
+ },
+ {
+  "app": "Messages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hi Mom, I'll be home late tonight.",
+  "phrase": "Open the window before you leave, it gets stuffy in there.",
+  "expected": "type",
+  "rendered": "Open the window before you leave, it gets stuffy in there.",
+  "rationale": "R2 default: 'open' is a trigger verb, but a physical window plus 'before you leave' and 'it gets stuffy' make this message content to Mom. Paired with the dictating=false Notes item (ask_first)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks for cleaning up the repo.",
+  "phrase": "Delete the old files when you get a chance.",
+  "expected": "type",
+  "rendered": "Delete the old files when you get a chance.",
+  "rationale": "R2: an instruction to the teammate inside an open dictation; 'when you get a chance' is human phrasing. Hark deleting files here would be a destructive misfire. Paired with the dictating=false Notes item (command)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Flight lands at 6.",
+  "phrase": "Call me when you land, I'll be awake.",
+  "expected": "type",
+  "rendered": "Call me when you land, I'll be awake.",
+  "rationale": "R2: imperative to the recipient; Hark cannot land or call. Paired with the dictating=false Slack item (ask_first)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "For tomorrow's release:",
+  "phrase": "Stop the cron job before you deploy, otherwise it double sends.",
+  "expected": "type",
+  "rendered": "Stop the cron job before you deploy, otherwise it double sends.",
+  "rationale": "Starts with 'stop' but is a complete instruction to a teammate about a cron job, not a stop phrase; R2 default type. A bare-keyword stop detector would kill the session mid-sentence."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The form is on the portal.",
+  "phrase": "Scroll down to the bottom of the page and you will see the download link.",
+  "expected": "type",
+  "rendered": "Scroll down to the bottom of the page and you will see the download link.",
+  "rationale": "'Scroll down' alone is a command (R2 exception), but 'and you will see the download link' addresses the recipient about their page, not Hark about this screen. Scrolling the user's WhatsApp window would be nonsense here."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Step 3:",
+  "phrase": "Select the vendor with the lowest quote and paste the comparison into the appendix.",
+  "expected": "type",
+  "rendered": "Select the vendor with the lowest quote and paste the comparison into the appendix.",
+  "rationale": "'select' and 'paste' are edit verbs, but their objects (a vendor, a comparison) are content inside a procedure being dictated; R2 type."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Reminder for the interns:",
+  "phrase": "Press the issue with them if they miss the date again.",
+  "expected": "type",
+  "rendered": "Press the issue with them if they miss the date again.",
+  "rationale": "'press' is a key-press verb only when followed by a key name; 'press the issue with them' is idiom inside dictated content. R2 type."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Honestly the new keyboard is great.",
+  "phrase": "I type fast now, almost 90 words a minute.",
+  "expected": "type",
+  "rendered": "I type fast now, almost 90 words a minute.",
+  "rationale": "'type' is the main verb of a declarative sentence about the user, not an instruction (R3 requires the phrase to start with the verb). R2 type."
+ },
+ {
+  "app": "Messages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Karaoke tonight!",
+  "phrase": "Don't stop believing is the first song, obviously.",
+  "expected": "type",
+  "rendered": "Don't stop believing is the first song, obviously.",
+  "rationale": "'don't stop' looks like a stop phrase but the clause continues with a subject and verb about a song title; R2 type."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The archivist noted:",
+  "phrase": "The scroll of the sheet was damaged at the edges but still legible.",
+  "expected": "type",
+  "rendered": "The scroll of the sheet was damaged at the edges but still legible.",
+  "rationale": "'scroll' and 'sheet' are nouns here, not a scroll command or a spreadsheet reference; R2 type."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Lyrics idea:",
+  "phrase": "Tell him to stop.",
+  "expected": "type",
+  "rendered": "Tell him to stop.",
+  "rationale": "'stop' at the end of a sentence whose subject is 'him'; the user is dictating, not addressing Hark. Stopping here would lose the line."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "About the export:",
+  "phrase": "The type of file doesn't matter, PDF or DOCX both work.",
+  "expected": "type",
+  "rendered": "The type of file doesn't matter, PDF or DOCX both work.",
+  "rationale": "'type' is a noun ('the type of file'), not the R3 typing verb; declarative content, R2 type."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Budget notes:",
+  "phrase": "Cut the marketing spend by ten percent and move it to hiring.",
+  "expected": "type",
+  "rendered": "Cut the marketing spend by ten percent and move it to hiring.",
+  "rationale": "'cut' and 'move' are edit verbs but their objects (marketing spend) are content, not text; R2 type. Contrast 'cut that and paste it at the top' (edit)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Your Jio number expires soon.",
+  "phrase": "Make sure the recharge goes through before the fifth or the number gets blocked.",
+  "expected": "type",
+  "rendered": "Make sure the recharge goes through before the fifth or the number gets blocked.",
+  "rationale": "R2 explicitly keeps recipient-directed imperatives like 'make sure…' as dictation; nothing refers to the screen or assistant."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Quick status:",
+  "phrase": "How are you doing on the migration? Need any help?",
+  "expected": "type",
+  "rendered": "How are you doing on the migration? Need any help?",
+  "rationale": "R2: questions inside the message go to the recipient; Hark is not doing a migration. Answering it as a command would derail the message."
+ },
+ {
+  "app": "VS Code (Claude Code chat box)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Refactor the parser to use a single routing table.",
+  "phrase": "And make sure the tests pass before you commit.",
+  "expected": "type",
+  "rendered": "And make sure the tests pass before you commit.",
+  "rationale": "The chat box's recipient is another agent; this imperative continues the prompt being dictated, so Hark types it (R2). Running it itself would put two agents in the repo at once."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Ok here is the address.",
+  "phrase": "14 Hill Road open bracket next to the pharmacy close bracket comma Bandra West",
+  "expected": "type",
+  "rendered": "14 Hill Road (next to the pharmacy), Bandra West",
+  "rationale": "R2 type with spoken punctuation rendered; 'open bracket'/'close bracket' are punctuation, never an 'open' command."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Grocery:",
+  "phrase": "milk comma eggs comma bread new line coffee",
+  "expected": "type",
+  "rendered": "milk, eggs, bread\ncoffee",
+  "rationale": "Content plus spoken punctuation and a break inside the phrase: render ',' twice and a single line break, keep the list items lowercase as spoken."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "That concludes the first section.",
+  "phrase": "New paragraph The second phase begins in April.",
+  "expected": "type",
+  "rendered": "\n\nThe second phase begins in April.",
+  "rationale": "A break word followed by content is 'type', not 'punctuation'; render the paragraph break then the sentence."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dinner at 8 works.",
+  "phrase": "That's enough for today, see you tomorrow.",
+  "expected": "type",
+  "rendered": "That's enough for today, see you tomorrow.",
+  "rationale": "'that's enough' is a stop phrase only when bare; here it is a full sentence to the recipient with a sign-off. Contrast the bare 'that's enough' item (stop)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Stuck in traffic on the highway.",
+  "phrase": "Cancel the 3pm meeting, I'll call in from the car instead.",
+  "expected": "type",
+  "rendered": "Cancel the 3pm meeting, I'll call in from the car instead.",
+  "rationale": "'cancel' is a stop phrase only when bare; with an object and a follow-up clause it is message content (R2). Contrast 'cancel' (stop) and 'no wait, cancel that' (edit)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "This voice app is a mess.",
+  "phrase": "I told Hark to stop and it kept going.",
+  "expected": "type",
+  "rendered": "I told Hark to stop and it kept going.",
+  "rationale": "'Hark' and 'stop' appear mid-sentence as reported speech; a vocative only opens the phrase. Type; stopping here would prove the complaint right."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, type hello",
+  "expected": "type",
+  "rendered": "hello",
+  "rationale": "R3: a vocative followed by the typing verb; strip 'Hark,' and 'type' and land exactly 'hello', lowercase as spoken."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Type I hope the meeting went well full stop",
+  "expected": "type",
+  "rendered": "I hope the meeting went well.",
+  "rationale": "R3: phrase starts with 'type'; the rest is verbatim intent with the spoken 'full stop' rendered as '.'."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type 250",
+  "expected": "type",
+  "rendered": "250",
+  "rationale": "R3 overrides the cell caution of R1: an explicit typing verb means put '250' in the cell now, no question asked."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "Phone / Email",
+  "phrase": "Address",
+  "expected": "type",
+  "rendered": "Address",
+  "rationale": "Header row being dictated cell by cell; a single capitalised noun continues the pattern, R2 type. Asking here would make spreadsheet dictation unusable."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Please send me your full",
+  "phrase": "name",
+  "expected": "type",
+  "rendered": "name",
+  "rationale": "The prior phrase dangles ('your full'); this one-word phrase completes it. Type lowercase with no added capital since it joins mid-sentence. Contrast 'Name.' with no prior (hold)."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I hope the meeting went well and that the client liked the demo.",
+  "expected": "type",
+  "rendered": "I hope the meeting went well and that the client liked the demo.",
+  "rationale": "R1: declarative sentence content with no command shape, in a textarea → type even with no session open."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Sorry for the late reply.",
+  "phrase": "I was like, stop, stop, and he just kept talking.",
+  "expected": "type",
+  "rendered": "I was like, stop, stop, and he just kept talking.",
+  "rationale": "'stop, stop' is quoted inside a narrative clause ('I was like … and he …'); R2 type. A keyword stop detector would cut the message in half."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Risks:",
+  "phrase": "Delete is not the same as archive comma make that clear in the docs full stop",
+  "expected": "type",
+  "rendered": "Delete is not the same as archive, make that clear in the docs.",
+  "rationale": "'Delete' is the sentence subject, not an edit verb with a text target; render the spoken comma and full stop."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Things to fix:",
+  "phrase": "Hark types commands into the document instead of running them.",
+  "expected": "type",
+  "rendered": "Hark types commands into the document instead of running them.",
+  "rationale": "'Hark' is the grammatical subject of a declarative sentence (no pause after it, no imperative follows), not a vocative; R2 type. Treating 'types commands…' as an instruction would be exactly the bug being described."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Label on the box:",
+  "phrase": "all caps warning full stop",
+  "expected": "type",
+  "rendered": "WARNING.",
+  "rationale": "'all caps X' uppercases the next word only; 'full stop' renders '.'."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The short answer is",
+  "phrase": "yes",
+  "expected": "type",
+  "rendered": "yes",
+  "rationale": "A bare 'yes' is normally a filler, but the prior phrase ends mid-sentence ('is'), so this completes it. Paired with the dictating=false Notes 'yes' (ignore)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "I land at 6am.",
+  "phrase": "Can you send it to me by tonight?",
+  "expected": "type",
+  "rendered": "Can you send it to me by tonight?",
+  "rationale": "R2: 'can you…' inside an open dictation is a question to the recipient ('to me' rules out Hark). Only at dictating=false does R1 route 'can you' to command."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Here is the link to the invite.",
+  "phrase": "Click accept so the calendar updates on your end.",
+  "expected": "type",
+  "rendered": "Click accept so the calendar updates on your end.",
+  "rationale": "'click' is a command verb, but 'on your end' addresses the recipient's screen, not this one; R2 type."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Movie starts at 9.",
+  "phrase": "Are you still coming tonight question mark",
+  "expected": "type",
+  "rendered": "Are you still coming tonight?",
+  "rationale": "In-message question to the recipient (R2) with spoken 'question mark' rendered as '?'."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The venue is",
+  "phrase": "capital Riverside capital Hall comma second floor",
+  "expected": "type",
+  "rendered": "Riverside Hall, second floor",
+  "rationale": "'capital X' capitalises only the next word; comma rendered; 'second floor' stays lowercase as spoken."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The first quarter closed strong",
+  "phrase": "new line",
+  "expected": "punctuation",
+  "rendered": "\n",
+  "rationale": "Break word only → insert one line break."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "That is the end of the intro",
+  "phrase": "next paragraph",
+  "expected": "punctuation",
+  "rendered": "\n\n",
+  "rationale": "Break word only → blank line."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "see you at the standup",
+  "phrase": "full stop",
+  "expected": "punctuation",
+  "rendered": ".",
+  "rationale": "Punctuation word only; must not type the words 'full stop' and must not be read as a stop phrase."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks again",
+  "phrase": "comma",
+  "expected": "punctuation",
+  "rendered": ",",
+  "rationale": "Punctuation word only."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "End of the list",
+  "phrase": "new line new line",
+  "expected": "punctuation",
+  "rendered": "\n\n",
+  "rationale": "Repeated break word: two line breaks, not one."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Agenda for Monday",
+  "phrase": "Hark, new line",
+  "expected": "punctuation",
+  "rendered": "\n",
+  "rationale": "Vocative plus a break word is still punctuation-only; strip the vocative and insert the break."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Send the amount",
+  "phrase": "open bracket",
+  "expected": "punctuation",
+  "rendered": "(",
+  "rationale": "R2 names 'open bracket' as punctuation even though 'open' is a command verb."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The deadline is tomorrow.",
+  "phrase": "make tomorrow bold",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Formatting instruction about a word Hark just typed; needs exact steps (select 'tomorrow', apply bold)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Buy flowers for the anniversary",
+  "phrase": "scratch that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction idiom: delete the last dictated phrase. Typing it would be the worst outcome."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "we ship on friday",
+  "phrase": "capitalize that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction on the previous phrase ('that' = the text just typed); edit, not dictation."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks, / Piyush",
+  "phrase": "delete the last line",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Explicit edit with a text target."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The results were mixed.",
+  "phrase": "command z, command z",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Repeated key chord: press Cmd+Z twice, not once; never type the words."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hi Sam",
+  "phrase": "press enter",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Key press instruction (may send the message in WhatsApp); contrast 'Press the issue with them' (type)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I want you to delete that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Statement-shaped edit: 'I want you to' addresses the assistant and the verb targets existing text."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Quarterly results",
+  "phrase": "that needs to be bold",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Declarative wording, but 'that' refers to the typed text and 'bold' is a format; edit."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "attached is the budget",
+  "phrase": "put that in brackets",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction on the previous phrase: wrap it in ( ). Not to be typed, not an 'open bracket' punctuation insert."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Good morning team",
+  "phrase": "type thanks a lot and then press enter",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R3 exception / R5: type 'thanks a lot' first, then press Enter; the key press makes it a multi-step edit, so the words 'press enter' must not land."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Agenda",
+  "phrase": "new line and then make it bold",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R5 multi-intent: insert the line break first, then bold the preceding text; labelled edit because an edit step is present."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "ok see you",
+  "phrase": "delete that and send it",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R5: delete the last phrase first, then send; edit step present → edit. Sending before deleting would ship the wrong text."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "cut that and paste it at the top",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Clipboard and cursor steps on existing text; contrast 'Cut the marketing spend…' (type)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "we grew 40 percent",
+  "phrase": "shit, that's wrong, undo",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Profanity plus a correction; the actionable part is undo. Typing the outburst into the doc is the worst outcome."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Call dentist",
+  "phrase": "no wait, cancel that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "'cancel that' with a referent is a correction (remove the last phrase), unlike bare 'cancel' which is stop."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, delete the last word",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Vocative plus explicit edit on text already in the box."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I need the last sentence gone",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Statement-shaped request whose object is text; equivalent to 'delete the last sentence'."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The launch moved to Tuesday afternoon",
+  "phrase": "select the last two words",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Selection instruction on typed text; contrast 'Select the vendor…' (type)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "See you at 5.",
+  "phrase": "send it",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: treats the message as an object; send, do not type."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks team!",
+  "phrase": "you should send it now",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Statement-shaped, but 'it' is the message and the action is send; command."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hello?",
+  "phrase": "it did not type",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "User complaining to Hark about typing; R2 lists it as command. Typing the complaint would be the worst reply."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The second phase begins in April.",
+  "phrase": "what did you type?",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Question addressed to Hark about its own output (R2 exception), not an in-message question."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hark, what time is it in Tokyo?",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Vocative plus a question to the assistant; R1 questions to the assistant → command."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Let me check the price.",
+  "phrase": "look at this screen and tell me what the total is",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Screen reference and request to the assistant (R2 exception) even mid-dictation."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": true,
+  "prior": "Phone",
+  "phrase": "go to cell B2",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Sheet navigation named in the policy as command, even with a cell dictation open."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "search for best ramen in Tokyo",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'search for X' is an assistant request; contrast the bare query 'best ramen in Tokyo' (ask_first)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks all.",
+  "phrase": "type thanks and send it",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R5 multi-intent: type 'thanks' first, then send; no edit step → command. Never type 'and send it'."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Delete the old files when you get a chance.",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: no session and an imperative Hark could carry out; the assistant should confirm which files before deleting anything. Paired with the dictating=true Slack item (type)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Create a plan for Monday and share it with the team by noon.",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: no session, imperative Hark can act on (draft and share a plan). Paired with the dictating=true WhatsApp item (type)."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Ok done.",
+  "phrase": "send",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Bare 'send' mid-dictation means send the message, not type the word."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "what type of file is this?",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'type' as a noun inside a question about the screen; command, nothing to type."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "um, can you, uh, scroll down a bit",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Fillers wrapped around a UI command; strip them and scroll, do not ignore the whole phrase."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "The numbers in column C are not adding up.",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Declarative, but it references the sheet ('column C'); R1 routes sheet references to command. Typing it into a cell would be absurd."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "can you open the terminal",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R1: 'can you' plus a Mac action with no session open."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks for the update.",
+  "phrase": "I need you to send this to Rahul by five.",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 names 'send this' as a command trigger even mid-dictation. Caution: the clause also reads as email content and sending is irreversible, so the model should confirm before sending; it must not type it blindly either."
+ },
+ {
+  "app": "Finder (desktop, nothing focused)",
+  "field": "none",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open Slack",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "No field focused; plain app-launch command."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Yeah so the thing is",
+  "phrase": "hey Hark stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Vocative plus bare stop; end dictation immediately, never type it."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The second phase",
+  "phrase": "stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Bare stop word with nothing else; contrast 'Tell him to stop.' (type)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "the deploy is",
+  "phrase": "don't fucking type",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Profanity-wrapped stop phrase listed in the policy; the profanity signals an already-angry user."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear team",
+  "phrase": "stop typing you piece of shit",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Stop phrase plus insult aimed at Hark; nothing here is content."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "the project kickoff",
+  "phrase": "no no no",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Repeated negation is a reaction to wrong typing; end the session rather than type it. Contrast the single 'no' (ignore)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "and the budget",
+  "phrase": "that's enough",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Bare stop phrase; contrast 'That's enough for today, see you tomorrow.' (type)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "the migration",
+  "phrase": "I'll type it myself",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Addressed to the assistant; the user is taking over, so end dictation. 'type' here is not the R3 verb."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hi",
+  "phrase": "don't type that",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Policy treats 'don't type' as stop; 'that' refers to the just-typed text, so the model may follow up by removing it, but the phrase itself must never land."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "the quarterly",
+  "phrase": "cancel",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Bare 'cancel' is stop; contrast 'no wait, cancel that' (edit) and 'Cancel the 3pm meeting…' (type)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Open the window before you leave, it gets stuffy in there.",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "No session; imperative shape (R1) but physically impossible for Hark and phrased to a person. Consult the model rather than type or act. Paired with the dictating=true Messages item (type)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Call me when you land, I'll be awake.",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Same shape: human-only imperative with no session; ask before typing. Paired with the dictating=true WhatsApp item (type)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Did the deploy go through?",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "A question Hark could answer by looking at the screen, or a message to a teammate; no session, so ask rather than type or investigate blindly."
+ },
+ {
+  "app": "Google Sheets (Chrome)",
+  "field": "cell",
+  "dictating": false,
+  "prior": "",
+  "phrase": "We lost two customers in March because of the outage.",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: a declarative sentence into a cell with no session → ask_first; the user is probably talking to the assistant."
+ },
+ {
+  "app": "Safari search field",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "best ramen in Tokyo",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Bare noun phrase in a search box with no typing verb and no session; could be a query or the start of a request. Contrast 'search for best ramen in Tokyo' (command) and the R3 'type' prefix (type)."
+ },
+ {
+  "app": "Chrome (sign-up form)",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I moved to Pune last year so the address is different.",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: single-line field plus a full sentence; the field wants an address, not an explanation, so the user is probably talking to the assistant."
+ },
+ {
+  "app": "Finder (desktop, nothing focused)",
+  "field": "none",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I hope the meeting went well.",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Declarative content with nowhere to type; ask where it should go or whether it was meant for Hark at all."
+ },
+ {
+  "app": "VS Code (Claude Code chat box)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "fix the failing test in CommandParserTests and run the suite again",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Imperative, but the focused field's recipient is itself an agent: the user may want it typed as a prompt or done by Hark. R1 alone would say command; two agents editing the repo is the costly mistake, so ask."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The migration slipped a week.",
+  "phrase": "so what I was thinking is",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "Six words, over R4's 1–4, but the trailing 'is' makes it an unmistakable cut-off; wait and join to the next phrase instead of typing a dangling clause."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "We fixed the login bug",
+  "phrase": "and then",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: two-word connective cut off by a pause; join to what follows."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Deployment checklist:",
+  "phrase": "What we need to",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: four-word sentence start, not a command, not a filler; wait."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "I know it's late",
+  "phrase": "but the thing is",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: cut-off clause start; join to the next phrase."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "hey Hark",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "Wake vocative with nothing after it; wait for the request rather than treating it as a command or typing it."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Name.",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "One bare noun, no session, no referent: not a command, not a filler (R4). Wait for the next phrase; contrast 'Address' in a header row (type) and 'name' completing a dangling sentence (type)."
+ },
+ {
+  "app": "Slack",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "uh",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Filler."
+ },
+ {
+  "app": "WhatsApp Web (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Let's meet at 5.",
+  "phrase": "mm-hmm",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Filler heard during dictation; never type it and do not end the session."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "yes",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Bare acknowledgement with no session and no dangling prior; paired with the dictating=true 'yes' (type)."
+ },
+ {
+  "app": "Mail",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear team,",
+  "phrase": "no",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "A single 'no' is too weak to act on and must not be typed; wait for a fuller phrase. Contrast 'no no no' (stop)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The onboarding flow has three steps full stop",
+  "phrase": "First the user signs up with email comma then verifies the code comma and finally picks a plan full stop",
+  "expected": "type",
+  "rendered": "First the user signs up with email, then verifies the code, and finally picks a plan.",
+  "rationale": "R2: dictation session open and the phrase is sentence content; spoken commas and full stops render as symbols with no space before them."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear Mr Sharma comma new line",
+  "phrase": "Thank you for your time yesterday full stop I have attached the revised quote for your review full stop",
+  "expected": "type",
+  "rendered": "Thank you for your time yesterday. I have attached the revised quote for your review.",
+  "rationale": "R2 default: letter body continuing the salutation Hark just typed; two spoken full stops rendered."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Chapter one new line",
+  "phrase": "The rain had not stopped for three days comma and the river was rising fast full stop",
+  "expected": "type",
+  "rendered": "The rain had not stopped for three days, and the river was rising fast.",
+  "rationale": "R2 default: narrative prose with spoken punctuation."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Shopping list new line",
+  "phrase": "milk comma eggs comma two kilos of rice comma and dish soap",
+  "expected": "type",
+  "rendered": "milk, eggs, two kilos of rice, and dish soap",
+  "rationale": "R2 default: list content; each spoken comma becomes ', '."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Agenda for Thursday",
+  "phrase": "Please review the budget before the meeting",
+  "expected": "type",
+  "rendered": "Please review the budget before the meeting",
+  "rationale": "R2: imperative addressed to the document's readers, not to Hark; no screen/app object and no edit verb, so it is content."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hi Priya comma",
+  "phrase": "Can you send me the final design files by Monday question mark",
+  "expected": "type",
+  "rendered": "Can you send me the final design files by Monday?",
+  "rationale": "R2: a question inside the message to Priya; 'can you' addresses the recipient. Contrast with 'can you make this bold' (edit)."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Notes from the client call",
+  "phrase": "the client wants the word all caps urgent in the subject line",
+  "expected": "type",
+  "rendered": "the client wants the word URGENT in the subject line",
+  "rationale": "'all caps X' is a dictation directive: render the next word in capitals and never type the words 'all caps'."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Travel plan",
+  "phrase": "we fly to capital p paris on the third",
+  "expected": "type",
+  "rendered": "we fly to Paris on the third",
+  "rationale": "'capital p' is a casing directive for the next word; the directive words are not typed."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Risks",
+  "phrase": "The vendor may delay delivery open bracket see appendix B close bracket which would push the launch",
+  "expected": "type",
+  "rendered": "The vendor may delay delivery (see appendix B) which would push the launch",
+  "rationale": "R2: open/close bracket are punctuation, not commands; space before '(' and none after, no space before ')'."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Plan for tomorrow",
+  "phrase": "What we need to do is bracket buy hundred rupees",
+  "expected": "type",
+  "rendered": "What we need to do is (buy hundred rupees",
+  "rationale": "Real log case. Dictating, so 'bracket' is spoken punctuation: an opening parenthesis with a space before it and none after; no closing bracket was spoken so none is typed."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Summary of the mic test",
+  "phrase": "We tested three microphones full stop new line The Shure performed best in a noisy room full stop",
+  "expected": "type",
+  "rendered": "We tested three microphones.\nThe Shure performed best in a noisy room.",
+  "rationale": "Content mixed with breaks: 'full stop' then 'new line' renders '.' followed by a line break; the capitalised 'The' from STT is kept."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Introduction",
+  "phrase": "This report covers the second quarter new paragraph Revenue grew by twelve percent",
+  "expected": "type",
+  "rendered": "This report covers the second quarter\n\nRevenue grew by twelve percent",
+  "rationale": "'new paragraph' inside a phrase renders as a blank line between the two sentences."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear team comma",
+  "phrase": "Make sure your timesheets are submitted before five pm on Friday",
+  "expected": "type",
+  "rendered": "Make sure your timesheets are submitted before five pm on Friday",
+  "rationale": "R2: imperative to the recipients of the memo, not to Hark."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear Ms Rao comma",
+  "phrase": "Stop by the office whenever you are free and we can go over the paperwork",
+  "expected": "type",
+  "rendered": "Stop by the office whenever you are free and we can go over the paperwork",
+  "rationale": "Starts with 'Stop' but 'stop by the office' is a phrasal verb inside a full sentence addressed to the reader; a stop phrase is bare ('stop', 'stop typing'). Halting here would be the lesser failure but still wrong."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Questions for the landlord",
+  "phrase": "Is the water heater included in the rent question mark",
+  "expected": "type",
+  "rendered": "Is the water heater included in the rent?",
+  "rationale": "R2: a question that belongs to the note, not a question to Hark; spoken question mark rendered."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Directions to the venue",
+  "phrase": "go to the end of the street and turn left at the temple",
+  "expected": "type",
+  "rendered": "go to the end of the street and turn left at the temple",
+  "rationale": "Pair with 'go to the end' (edit): here 'go to the end' has an object in the world (the street), so it is content for the reader, not a caret move."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hi Rohan comma",
+  "phrase": "Send me the file by Friday so I can review it over the weekend",
+  "expected": "type",
+  "rendered": "Send me the file by Friday so I can review it over the weekend",
+  "rationale": "R2: 'send me the file' asks the recipient; 'send it' or 'send the message' would be a command about the message itself."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Bug report",
+  "phrase": "Look at the attached screenshot for the exact error message",
+  "expected": "type",
+  "rendered": "Look at the attached screenshot for the exact error message",
+  "rationale": "Addressed to whoever reads the report; 'look at this screen' would address Hark, 'the attached screenshot' does not."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Testimonials",
+  "phrase": "open quote this is the best tool I have used all year close quote said one customer",
+  "expected": "type",
+  "rendered": "\"this is the best tool I have used all year\" said one customer",
+  "rationale": "Spoken quotation marks render as straight double quotes hugging the quoted span."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Budget",
+  "phrase": "the total comes to twelve thousand five hundred rupees including delivery",
+  "expected": "type",
+  "rendered": "the total comes to twelve thousand five hundred rupees including delivery",
+  "rationale": "R2 default; Indian-English number words are typed as spoken."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "milk comma eggs comma two kilos of rice comma and dish soap",
+  "phrase": "and also some ginger",
+  "expected": "type",
+  "rendered": "and also some ginger",
+  "rationale": "Four words but a complete list continuation ending in a noun, not a cut-off sentence start; R2 default applies."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Meeting notes for Monday, we agreed to ship the beta by the end of the month.",
+  "expected": "type",
+  "rendered": "Meeting notes for Monday, we agreed to ship the beta by the end of the month.",
+  "rationale": "R1: no typing verb and no command shape; declarative content in a note body is typed. STT's own punctuation is kept as is."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "The build has been failing since yesterday because the signing certificate expired.",
+  "expected": "type",
+  "rendered": "The build has been failing since yesterday because the signing certificate expired.",
+  "rationale": "R1 declarative in a textarea."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "open the daily note",
+  "phrase": "Slept badly, skipped the gym, but finished the pricing draft.",
+  "expected": "type",
+  "rendered": "Slept badly, skipped the gym, but finished the pricing draft.",
+  "rationale": "The prior phrase was a command Hark ran, so no dictation session is open; the new phrase is a journal sentence and R1 types it."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "create a new node",
+  "phrase": "Shopping list",
+  "expected": "type",
+  "rendered": "Shopping list",
+  "rationale": "After Hark created the note, a complete noun phrase is its first line; not a command, not a filler and not a cut-off sentence start, so it is typed rather than held."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "Costs stayed flat because we paused hiring.",
+  "expected": "type",
+  "rendered": "Costs stayed flat because we paused hiring.",
+  "rationale": "Window-expiry edge: the prior was typed more than 90 s ago so dictating is false, but R1 still types a declarative sentence in a document body."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type the quick brown fox jumps over the lazy dog",
+  "expected": "type",
+  "rendered": "the quick brown fox jumps over the lazy dog",
+  "rationale": "R3: leading 'type' is stripped and the rest is typed verbatim."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "write down call the plumber about the kitchen tap",
+  "expected": "type",
+  "rendered": "call the plumber about the kitchen tap",
+  "rationale": "R3: 'write down' is a typing verb; 'call the plumber' is content, not a command to Hark."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Action items",
+  "phrase": "type delete the last line",
+  "expected": "type",
+  "rendered": "delete the last line",
+  "rationale": "R3: verbatim intent even though the content is itself an edit phrase; pair with 'Remove the last line' (edit)."
+ },
+ {
+  "app": "Notes",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type budget",
+  "expected": "type",
+  "rendered": "budget",
+  "rationale": "R3 overrides the single-line ask_first default: an explicit typing verb means type the word into the search field."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear Ms Rao comma",
+  "phrase": "type in stop sending the paper invoices",
+  "expected": "type",
+  "rendered": "stop sending the paper invoices",
+  "rationale": "R3: 'type in' prefix; the word 'stop' inside the content is not a stop phrase."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "milk comma eggs comma two kilos of rice comma and dish soap",
+  "phrase": "new line",
+  "expected": "punctuation",
+  "rendered": "\n",
+  "rationale": "Break-only phrase: insert a line break."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "new paragraph",
+  "expected": "punctuation",
+  "rendered": "\n\n",
+  "rationale": "Break-only phrase: insert a blank line (two line breaks)."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "I have attached the revised quote for your review",
+  "phrase": "full stop",
+  "expected": "punctuation",
+  "rendered": ".",
+  "rationale": "Punctuation-only phrase: insert a period directly after the previous word."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "he said the API will be ready by Friday",
+  "phrase": "comma",
+  "expected": "punctuation",
+  "rendered": ",",
+  "rationale": "Punctuation-only phrase."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Is the water heater included in the rent",
+  "phrase": "Question mark.",
+  "expected": "punctuation",
+  "rendered": "?",
+  "rationale": "Punctuation-only phrase; STT's own capital and trailing period are discarded."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The vendor may delay delivery open bracket see appendix B",
+  "phrase": "close bracket",
+  "expected": "punctuation",
+  "rendered": ")",
+  "rationale": "R2: close bracket is punctuation closing the parenthesis opened in the prior phrase; not a command."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "buy milk",
+  "phrase": "Next line.",
+  "expected": "punctuation",
+  "rendered": "\n",
+  "rationale": "'next line' is a break word; STT capital and period ignored."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Project plan",
+  "phrase": "make that a heading",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Formatting instruction about the line just typed: select it and apply heading style (Notes: Shift-Cmd-H)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Heading, project plan.",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "'heading: X' is a structure directive plus content: apply Heading style, type 'Project plan', return to normal style. Multi-step, so edit rather than plain type."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Quarterly Report",
+  "phrase": "make the title bigger",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Formatting change to existing text (increase the font size of the title line)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "Shopping list",
+  "phrase": "Retype heading as To-do list",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Real log case: 'retype X as Y' is a replace instruction on existing text (the heading line becomes 'To-do list'); not dictation and not an app command."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "Retype heading as To-do list",
+  "phrase": "From now forward create a checklist and first item as buy milk",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Real log case, R5: a format step (toggle checklist, Notes Shift-Cmd-L) followed by content ('buy milk') as the first item; edit because of the format step, with the item text typed after it."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "ship the beta new line fix the login bug new line update the pricing page",
+  "phrase": "make these bullet points",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Format the lines just typed as a bulleted list."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Tasks for today",
+  "phrase": "add a checkbox item review the pull request",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "List structure plus content: insert '- [ ] review the pull request' on a new line; the checkbox markup is a structural edit, not literal dictation."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "buy milk",
+  "phrase": "next item",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "List operation (start the next checklist item), not in the punctuation set, so it routes to edit steps (Return inside the list)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Please review the budget before the meeting",
+  "phrase": "bold that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Formatting of the text just typed."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The rain had not stopped for three days comma and the river was rising fast full stop",
+  "phrase": "underline the last word",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Select the last word ('fast') and apply underline."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Meeting tomorrow at ten",
+  "phrase": "can you make this bold",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "'can you' addressed to Hark about the text; pair with 'can you send me the final design files' (type)."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thinking Fast and Slow by Daniel Kahneman",
+  "phrase": "indent that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Indent the current line (Tab / list indent)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "select from start to end",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Selection instruction (select from document start to end)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Meeting tomorrow at ten",
+  "phrase": "select the word tomorrow",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Selection of a specific word in the typed text."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "and also some ginger",
+  "phrase": "scratch that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction: delete the last dictated phrase."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent full stop Costs were flat full stop",
+  "phrase": "delete the last sentence",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction with a precise scope (the last sentence)."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Meeting tomorrow at ten",
+  "phrase": "replace tomorrow with Friday",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Find-and-replace on the typed text."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "this is the best tool I have used all year",
+  "phrase": "put that in quotes",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Wrap the last phrase in quotation marks."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "he said the API will be ready by Friday",
+  "phrase": "capitalize that",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Casing correction on the text just typed."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "buy milk new line eggs",
+  "phrase": "Remove the last line",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Real log case: delete the last line of the note; 'remove' is a correction verb about the text."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Hawk is working",
+  "phrase": "Hark is working, Hark is spelled as H A R K",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Real log case: STT wrote 'Hawk' for the prior phrase; the user repeats the sentence and spells the name. The spelling clause is a correction instruction, never content: fix 'Hawk' to 'Hark' so the note reads 'Hark is working', and do not type the sentence twice or the letters."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The vendor may delay delivery which would push the launch",
+  "phrase": "wrap the last sentence in parentheses",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction: put brackets around the last sentence."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Costs stayed flat because we paused hiring full stop",
+  "phrase": "go to the end",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Caret move to the end of the document; pair with 'go to the end of the street' (type)."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "go to the beginning of the line",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Cursor movement (Cmd-Left); recognisable without an open session."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "command z",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Spoken key chord = undo; key presses are edit."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "type buy milk and then press enter",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R3 exception: typed words followed by an explicit key press, so a multi-step edit (type 'buy milk', press Return)."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thanks for your help",
+  "phrase": "write regards comma Piyush and make it italic",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R3 exception: typing verb plus a formatting step after the typed words ('Regards, Piyush' then italic)."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Meeting tomorrow at ten",
+  "phrase": "delete that and then type Monday at nine",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "R5 multi-intent: the first step is a deletion (edit), then type 'Monday at nine'."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Ark should remember the last app I was dictating into",
+  "phrase": "that should be Hark with an H",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Correction of an STT misrecognition in the prior phrase: replace 'Ark' with 'Hark'; the clause itself is never typed."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Dear Mr Sharma comma",
+  "phrase": "cut that line and paste it at the top",
+  "expected": "edit",
+  "rendered": "",
+  "rationale": "Cut/paste with a target position: exact edit steps on the document."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "create a new node",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Real log case: STT heard 'node' for 'note'. Not dictating and the shape is an imperative to the app, so it is a command (Cmd-N in Notes), not text to type."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "delete this note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Acts on the note as an object (app-level delete), not on text inside it."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "I have attached the revised quote for your review full stop",
+  "phrase": "save",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Even mid-dictation a bare 'save' is an app action (Cmd-S), not content; R2 exception for treating the document as an object."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open the previous note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Navigation inside the app."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "search my notes for budget",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'search for X' is a command; it uses the Notes search field, not the note body."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "We tested three microphones full stop",
+  "phrase": "close this",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: 'this' is the window/document; close it (Cmd-W), do not type 'close this'."
+ },
+ {
+  "app": "Obsidian",
+  "field": "none",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open the daily note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "No text field focused (the file explorer has focus) and the phrase is an unambiguous app command."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "share this doc with Arjun",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: treats the document as an object and asks Hark to operate the Share dialog."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "two cups of lentils comma one teaspoon of turmeric comma and salt to taste",
+  "phrase": "read it back",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception listed explicitly: a request to Hark about what was typed."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "First the user signs up with email comma then verifies the code comma and finally picks a plan full stop",
+  "phrase": "what did you type?",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Question addressed to Hark about its own output."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Plan for tomorrow",
+  "phrase": "nothing is typing",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Complaint addressed to Hark about the typing failure; typing these words would compound the failure."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Today I spent most of the morning debugging the audio pipeline",
+  "phrase": "Hark, how many words is this note so far?",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Vocative 'Hark' plus a question to the assistant; never typed."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Phase one ends in March semicolon phase two starts in April",
+  "phrase": "scroll down",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R2 exception: UI action on the window."
+ },
+ {
+  "app": "Obsidian",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "open the budget note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "The quick switcher is focused, but the phrase is command-shaped ('open ...'), so Hark opens the note rather than asking or typing."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Meeting tomorrow at ten",
+  "phrase": "you typed it in the wrong note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "Addresses Hark about where its output landed; a complaint to act on, not content."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "create a new note called sprint retro",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "App action with a name argument; the name goes into the new note's title as part of the command, not into the current note."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "buy milk",
+  "phrase": "type done for today and then create a new note",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "R5 multi-intent with no edit step: Hark types 'done for today' first, then creates the note; routed as a command plan rather than verbatim text, so 'then create a new note' is never typed."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "can you summarize this note for me",
+  "expected": "command",
+  "rendered": "",
+  "rationale": "'can you' plus 'this note' addresses Hark about the document; a request to the assistant."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "milk comma eggs comma two kilos of rice comma and dish soap",
+  "phrase": "stop",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Bare stop phrase ends dictation; never typed."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The vendor may delay delivery open bracket see appendix B close bracket which would push the launch",
+  "phrase": "stop typing",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Explicit stop phrase."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Thank you for your time yesterday full stop",
+  "phrase": "no no don't type",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "'don't type' with an alarmed repetition; stop immediately."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "he said the API will be ready by Friday but QA needs another week",
+  "phrase": "that's enough, stop listening",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "Two stop phrases; end dictation and stop listening."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "Cancel.",
+  "expected": "stop",
+  "rendered": "",
+  "rationale": "'cancel' is a stop phrase; STT capital and period are irrelevant."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "What we need to do is bracket buy hundred rupees",
+  "phrase": "After the bracket, okay this is good enough",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Real log case: 'the bracket' refers to the parenthesis Hark just typed, so the phrase treats the typed text as an object (outside R2's default), yet it also reads like a spoken aside. Typing it into the note would be the worse failure and there is no safe command to run, so consult the model before doing anything."
+ },
+ {
+  "app": "Obsidian",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "the budget review from last week",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: the quick switcher is a single-line field and the phrase is a noun phrase, not a command; it could be a search term or something the user is talking about, so ask before typing."
+ },
+ {
+  "app": "Notes",
+  "field": "single-line",
+  "dictating": false,
+  "prior": "",
+  "phrase": "I think the invoice was in the March folder",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "R1: a sentence into the Notes search box is unlikely to be wanted verbatim; the user is probably talking to Hark or to someone else."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "the next paragraph should talk about pricing",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Declarative shape but it is about the document ('the next paragraph should...'), so it may be an instruction to draft rather than content; neither typing nor drafting blindly is safe."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The vendor may delay delivery open bracket see appendix B close bracket which would push the launch",
+  "phrase": "that doesn't sound right",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Could be a continuation of the risk paragraph or a reaction to what Hark typed; 'that' is unresolved, so ask before typing."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "I need to renew the car insurance before the fifteenth",
+  "phrase": "remind me about this tomorrow",
+  "expected": "ask_first",
+  "rendered": "",
+  "rationale": "Inside a note the addressee is ambiguous: a line meant for the note, or a request for Hark to set a reminder ('this' = the typed line). Neither typing nor creating a reminder should happen blindly."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "The dentist moved our appointment to Thursday",
+  "phrase": "Even though the",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4: three-word sentence start cut off by a pause; wait and join to the next phrase."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Revenue grew by twelve percent",
+  "phrase": "The main reason",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "Sentence opener with no verb yet; hold and join."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "We tested three microphones full stop",
+  "phrase": "In the second",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "Prepositional sentence start cut off mid noun phrase; hold."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Before we start the",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "R4 applies even with no session open: a declarative opener of four words, not a command, not a filler."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "he said the API will be ready by Friday but QA needs another week",
+  "phrase": "If the client",
+  "expected": "hold",
+  "rendered": "",
+  "rationale": "Conditional clause opener; hold for the rest."
+ },
+ {
+  "app": "Notes",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "milk comma eggs comma two kilos of rice comma and dish soap",
+  "phrase": "uh",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Filler."
+ },
+ {
+  "app": "Google Docs (Chrome)",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Phase one ends in March semicolon phase two starts in April",
+  "phrase": "mm-hmm",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Back-channel noise, not content."
+ },
+ {
+  "app": "TextEdit",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "yeah",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Filler/acknowledgement; nothing to type or run."
+ },
+ {
+  "app": "Obsidian",
+  "field": "textarea",
+  "dictating": true,
+  "prior": "Today I spent most of the morning debugging the audio pipeline",
+  "phrase": "Okay.",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Acknowledgement while reviewing what was typed; not a note line."
+ },
+ {
+  "app": "Pages",
+  "field": "textarea",
+  "dictating": false,
+  "prior": "",
+  "phrase": "Hmm.",
+  "expected": "ignore",
+  "rendered": "",
+  "rationale": "Thinking noise."
+ }
+]

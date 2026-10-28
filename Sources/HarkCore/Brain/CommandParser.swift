@@ -519,37 +519,9 @@ public struct CommandParser {
     static func typedPart(_ request: String) -> String? {
         guard let m = request.trimmingCharacters(in: .whitespacesAndNewlines)
             .firstMatch(#"^(?i:type in|type into|type out|type|dictate|write down|write in it|write into it|write in there|write here|write)[.:,]?\s+(.+)$"#) else { return nil }
-        return m[1].replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|there|here|this)\s*[,:]?\s+"#, with: "", options: .regularExpression)
+        // "type here: hello" → "hello"; "type this is great" keeps "this", "type there are three" keeps "there".
+        return m[1].replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|here)\s*[,:]?\s+|^(?i:there|this)\s*[,:]\s*"#, with: "", options: .regularExpression)
     }
-
-    /// What a phrase is while you're writing (or after "type …"). `words`: type it now — line breaks already applied,
-    /// the writing pass fixes the rest a moment later. `aboutText`: an instruction about what you've written ("put that
-    /// in brackets", "scratch that"), which the writing pass carries out. `edit`: formatting, selection, cursor or keys,
-    /// which need edit steps.
-    public enum WritingKind: Equatable, Sendable { case words(String), aboutText, edit }
-
-    public static func writingKind(_ phrase: String) -> WritingKind {
-        let typed = typedPart(phrase)
-        let text = dictation(typed ?? phrase)
-        let words = text.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
-        if !Set(words).isDisjoint(with: editWords) { return .edit }
-        if typed == nil, let first = words.first, instructionStarts.contains(first) { return .aboutText }
-        return text.isEmpty ? .aboutText : .words(text)
-    }
-
-    /// Words that need edit steps, not just text: formatting, selection, the cursor, the clipboard, keys.
-    static let editWords: Set<String> = [
-        "heading", "headings", "title", "subtitle", "subheading", "bold", "italic", "italics", "underline", "underlined",
-        "strikethrough", "bullet", "bullets", "bulleted", "numbered", "checklist", "checkbox", "select", "selection",
-        "highlight", "cursor", "caret", "copy", "paste", "undo", "redo", "font", "formatting", "indent", "press",
-        "translate", "summarize", "rewrite",
-    ]
-
-    /// How an instruction about the text starts ("put that in brackets", "scratch that", "change X to Y").
-    static let instructionStarts: Set<String> = [
-        "put", "make", "change", "replace", "delete", "remove", "erase", "scratch", "fix", "correct", "move", "add",
-        "insert", "capitalize", "wrap", "spell", "strike", "drop",
-    ]
 
     /// Words that can turn a sentence into an instruction about the text. Broad on purpose.
     static let instructionWords: Set<String> = [

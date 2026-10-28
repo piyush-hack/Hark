@@ -28,18 +28,21 @@ public enum EditorBrain {
     Rules:
     - You only edit this text. Never answer, explain, or refuse anything yourself: if it isn't an edit to [Text], reply {"ops":[{"op":"agent"}]}.
     - Do what they MEAN, never type an instruction. "type heading as Introduction" → insert "Introduction" then format heading. "write thanks in bold" → insert "thanks", select "thanks", format bold. "new paragraph" → insert "\\n\\n". "go to the end" → caret to end.
+    - [Said] may be words to write here or a request for Hark; Hark couldn't tell from the words alone. Words meant for this field — a message to someone (even "call me when you land", "buy milk"), a note, a list item, a prompt for the chat box in [App] — insert them, cleaned up. A request for the assistant — to do something on the Mac or in the app (open, click, find, create a header, fill rows, send it), or a question for it to answer — {"ops":[{"op":"agent"}]}. In a spreadsheet cell or a search box, a whole sentence is almost always a request.
     - If [Recent] shows they're writing and the words read as content, insert them; if they describe an action on the text, do the action.
     - "cut" and "copy" must use the cut/copy ops (they fill the clipboard, so a later paste works); "remove"/"delete" use delete.
     - The quoted "text" IS exactly what gets selected, deleted, or cut: quote just that (one word → that word), exactly as it appears in [Text]. If it appears more than once, add "occurrence" (the nearest to the caret is the default). Never invent text that isn't there.
     - Clean speech when inserting: drop uh/um, fix capitalization and punctuation, keep their words.
     - Noise or nothing meaningful: {"ops":[]}.
 
-    Writing session: with [Heard], they're dictating and Hark has already typed their words, unchecked. [Before] is the text before this session (context only). [Written] is what's already been made right; [Just typed] follows it: Hark's rough typing of the newest speech. [Heard] is that speech, raw speech-to-text, in order: words to write, maybe with instructions about them ("next line", "put that in brackets", "scratch that").
-    Reply ONLY {"text":"…"}: what [Written] + [Just typed] should become. Fix mishearings and names from the context; spelled-out letters make the word, and a word said and then spelled is written once, as spelled ("Shawn, S E A N" → "Sean"); carry out the instructions instead of writing them ("brackets" are round ( ) unless they say square); get punctuation and capitals right; keep line breaks. Keep their words: don't reword, add, or improve. Leave [Written] as it is unless an instruction changes it.
-    If something in [Heard] was a request to the assistant, not text (a question to answer, "open Chrome", "send it"), leave it out of "text" and add "ask":"that request".
+    Writing session: with [Heard], they're dictating and Hark has already typed their words. [Before] is the text before this session (context only). [Written] has been checked already; [Just typed] follows it: Hark's typing of the newest speech, with spoken punctuation already applied. [Heard] is that speech, raw speech-to-text, in order.
+    Reply ONLY {"text":"…"}: what [Written] + [Just typed] should become.
+    - Fix what speech recognition got wrong in [Just typed], using the context: misheard words and names, a word said and then spelled out (write it once, as spelled: "Shawn, S E A N" → "Sean"), self-corrections ("ninety, no, sixty" → "sixty"), punctuation and capitals, joins between phrases ("the meeting. went well" → "the meeting went well").
+    - If [Heard] has an instruction about the text ("put that in brackets", "scratch that", "I meant Friday", "it's spelled H A R K"), carry it out — it may change [Written]. Brackets are round ( ) unless they say square.
+    - Otherwise leave [Written] exactly as it is, and never drop a phrase: keep their words; don't reword, add, summarise, or answer anything.
     """
 
-    /// A writing pass's answer: the text the session should become, and a request found among the words, if any.
+    /// A writing pass's answer: the text the session should become (and, from older prompts, a request — ignored now).
     public static func session(from reply: String) -> (text: String?, ask: String?) {
         guard let start = reply.firstIndex(of: "{"), let end = reply.lastIndex(of: "}"),
               let json = try? JSONSerialization.jsonObject(with: Data(reply[start...end].utf8)) as? [String: Any] else { return (nil, nil) }
@@ -123,13 +126,15 @@ public actor LiveClaude {
     }
 
     /// Sends one request made of text and image blocks; returns the model's final reply text.
-    public func ask(content: [[String: Any]]) async throws -> String {
+    /// `keepOpen`: don't start a fresh session yet even if this one is used up — a follow-up (`followUp: true`) about this
+    /// very request is coming, and it must reach the conversation that remembers it. Then call `restartIfUsedUp`.
+    public func ask(content: [[String: Any]], keepOpen: Bool = false, followUp: Bool = false) async throws -> String {
         guard let binary = ClaudeBrain.binary else { throw HarkError("Claude Code isn't installed.") }
         // One request at a time: a background check and a spoken request can't share the one reply slot.
         await acquire()
         defer { release() }
         try Task.checkCancellation()
-        if turns >= turnLimit { stop() }  // keep the conversation short, so it stays fast
+        if turns >= turnLimit, !followUp { stop() }  // keep the conversation short, so it stays fast
         if process == nil { start(binary) }
         let wait = warmup - Date().timeIntervalSince(startedAt)
         if turns == 0, wait > 0 {
@@ -159,11 +164,21 @@ public actor LiveClaude {
         Log.info(String(format: "%@ answered in %.2fs", label, Date().timeIntervalSince(started)))
         scheduleIdleStop()
         // Used up: start the next session now, so it's warm (its MCP servers connected) for the next request.
-        if turns >= turnLimit {
+        if turns >= turnLimit, !keepOpen {
             stop()
             start(binary)
         }
         return reply
+    }
+
+    /// After an `ask` with `keepOpen` and no follow-up: if the session is used up, start the next one now, warm.
+    public func restartIfUsedUp() async {
+        guard turns >= turnLimit, let binary = ClaudeBrain.binary else { return }
+        await acquire()
+        defer { release() }
+        guard turns >= turnLimit else { return }
+        stop()
+        start(binary)
     }
 
     private var busy = false

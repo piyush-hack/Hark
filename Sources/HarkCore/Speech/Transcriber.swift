@@ -50,15 +50,23 @@ public actor Transcriber {
         }
     }
 
+    /// The last result's confidence (mean token probability, 0–1), for the log.
+    public private(set) var lastConfidence: Float = 0
+
     public func transcribe(_ samples: [Float]) async throws -> String {
         guard samples.count > 1_600 else { return "" }
-        var audio = samples
+        // Silence after the last word lets the model finish it: tested on Indian-English speech, word errors fell from
+        // 15% to 12% ("Command Zid" → "Command Z", "Huck is spelled" → "Hark is spelled").
+        var audio = samples + [Float](repeating: 0, count: Self.trailingSilence)
         if audio.count < 16_000 { audio += [Float](repeating: 0, count: 16_000 - audio.count) }
         let manager = try await manager()
         let result = try await manager.transcribe(audio, source: .microphone)
         lastUse = Date()
+        lastConfidence = result.confidence
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    static let trailingSilence = 7_200  // 0.45 s
 
     public func unloadIfIdle(after seconds: TimeInterval) {
         guard asr != nil, Date().timeIntervalSince(lastUse) > seconds else { return }
