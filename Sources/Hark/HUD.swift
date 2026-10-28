@@ -232,7 +232,6 @@ struct HUDView: View {
                 .gesture(moveGesture)
                 .onTapGesture(count: 2) { layout.onResetPosition() }
                 Spacer(minLength: 6)
-                if engine.needsAttention { muteButton }
                 trailing
                 smallButton("minus", help: "Minimize") { layout.setMinimized(true) }
             }
@@ -411,10 +410,6 @@ struct HUDView: View {
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
                 .fixedSize()
-            if engine.needsAttention {
-                Circle().fill(Color.orange).frame(width: 7, height: 7)
-                muteButton
-            }
             if [.transcribing, .thinking, .working].contains(engine.phase) || (engine.handsFree && engine.isBusy) {
                 ProgressView().controlSize(.mini).tint(.white)
             }
@@ -431,10 +426,6 @@ struct HUDView: View {
         .gesture(moveGesture)
         .onTapGesture(count: 2) { layout.setMinimized(false) }
         .padding(.top, 4)
-    }
-
-    private var muteButton: some View {
-        smallButton("bell.slash.fill", help: "Stop the tick for this one") { engine.muteAttention() }
     }
 
     private func smallButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {

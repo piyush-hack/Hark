@@ -34,7 +34,9 @@ final class CommandParserTests: XCTestCase {
     }
 
     func testKeysAndTyping() {
-        XCTAssertEqual(plan("type hello world and press enter"), [.typeText("hello world"), .pressKeys(KeyCombo(key: "return"))])
+        // "and press enter" is part of the writing request; the writing model turns it into a key press.
+        XCTAssertEqual(plan("type hello world and press enter"), [.edit("type hello world and press enter")])
+        XCTAssertNil(CommandParser.plainText("type hello world and press enter"))
         XCTAssertEqual(plan("press command shift T"), [.pressKeys(KeyCombo(key: "t", command: true, shift: true))])
         XCTAssertEqual(plan("copy that, then paste"), [.pressKeys(KeyCombo(key: "c", command: true)), .pressKeys(KeyCombo(key: "v", command: true))])
         XCTAssertEqual(plan("Click the sign in button"), [.click("sign in")])
@@ -100,7 +102,7 @@ final class RealUsageTests: XCTestCase {
 
     func testNotesFlowFromRealUse() {
         XCTAssertEqual(parser.plan("Open notes, create a new note and write in it, how are you doing?"), [
-            .openApp("Notes"), .pressKeys(KeyCombo(key: "n", command: true)), .typeText("how are you doing?"),
+            .openApp("Notes"), .pressKeys(KeyCombo(key: "n", command: true)), .edit("write in it, how are you doing?"),
         ])
     }
 
@@ -170,9 +172,13 @@ final class ContinuousTypingTests: XCTestCase {
     let parser = CommandParser(apps: ["Notes"])
 
     func testTypeInRunsImmediately() {
-        XCTAssertEqual(parser.plan("Open notes. Type in hello, how are you?"), [.openApp("Notes"), .typeText("hello, how are you?")])
+        XCTAssertEqual(parser.plan("Open notes. Type in hello, how are you?"), [.openApp("Notes"), .edit("Type in hello, how are you?")])
         let streamed = parser.streamingPlan("Type in hello, how are you?")
-        XCTAssertEqual(streamed.ready, [.typeText("hello, how are you?")], "typing shouldn't wait for the key release")
+        XCTAssertEqual(streamed.ready, [.edit("Type in hello, how are you?")], "plain typing shouldn't wait for a pause")
+        XCTAssertEqual(CommandParser.plainText("Type in hello, how are you?"), "hello, how are you?")
+        // Might be an instruction: waits for the pause, then goes to the writing model.
+        XCTAssertEqual(parser.streamingPlan("type heading as Introduction").ready, [])
+        XCTAssertNil(CommandParser.plainText("type heading as Introduction"))
     }
 }
 
@@ -206,7 +212,8 @@ final class VocabularyTests: XCTestCase {
 final class PausePunctuationTests: XCTestCase {
     func testPausesDontBreakCommands() {
         let parser = CommandParser(apps: ["Notes", "Google Chrome"])
-        XCTAssertEqual(parser.plan("Open notes. Type in. Hello, how are you"), [.openApp("Notes"), .typeText("Hello, how are you")])
+        XCTAssertEqual(parser.plan("Open notes. Type in. Hello, how are you"), [.openApp("Notes"), .edit("Type in. Hello, how are you")])
+        XCTAssertEqual(CommandParser.plainText("Type in. Hello, how are you"), "Hello, how are you")
         XCTAssertEqual(parser.plan("open groom"), [.openApp("Google Chrome")])
         XCTAssertEqual(parser.plan("Whenever I open this website, remind me that this is a sensitive page"),
                        [.watch(WatchSpec(scope: .anywhere, text: WatchSpec.currentSite, action: "remind me that this is a sensitive page"))])
@@ -314,33 +321,6 @@ final class SegmenterTests: XCTestCase {
     }
 }
 
-final class DictationTests: XCTestCase {
-    let parser = CommandParser(apps: ["Notes", "Google Chrome"])
-
-    /// The exact phrases from a real session: each is an instruction, none should be typed literally.
-    func testFormattingPhrasesAreInstructions() {
-        XCTAssertEqual(parser.parse("In the next line").first?.command, .typeText("\n"))
-        XCTAssertEqual(parser.parse("Uh go to new paragraph").first?.command, .typeText("\n\n"))
-        XCTAssertEqual(parser.parse("Start typing").first?.command, .typeText(""))
-        let joined = HarkEngine.joinPhrases("Now, in the next line, create a", "Uh new paragraph")
-        XCTAssertEqual(parser.plan(joined), [.typeText("\n"), .typeText("\n\n")])
-    }
-
-    func testBreaksInsideTypedText() {
-        let typed = parser.plan("type how are you, new paragraph, I'm fine").compactMap { command -> String? in
-            if case .typeText(let text) = command { return text } else { return nil }
-        }.joined()
-        XCTAssertEqual(typed, "how are you\n\nI'm fine")
-        XCTAssertEqual(CommandParser.dictation("How are you? New line. I'm fine, um, thanks"), "How are you?\nI'm fine, thanks")
-        XCTAssertEqual(CommandParser.dictation("We need a new line of products"), "We need a new line of products")
-    }
-
-    func testInstructionsWhileTypingAreNotTyped() {
-        XCTAssertTrue(parser.looksLikeInstruction("Now, create a table here"))
-        XCTAssertFalse(parser.looksLikeInstruction("I'm fine, thanks"))
-        XCTAssertTrue(CommandParser.endsMidThought("Now, in the next line, create a"))
-    }
-}
 
 final class SiteSearchTests: XCTestCase {
     /// Network: run with HARK_NETWORK_TESTS=1.
@@ -357,24 +337,6 @@ final class SiteSearchTests: XCTestCase {
     }
 }
 
-final class InstructionPhrasingTests: XCTestCase {
-    let parser = CommandParser(apps: ["Notes"])
-
-    func testInstructionsInAnyWording() {
-        for phrase in ["put a gap here", "one more blank line", "get rid of the last bit", "bold that", "go back to the previous word",
-                       "Make the first letter capital", "start from the next row", "remove what's written here", "erase everything above"] {
-            XCTAssertTrue(parser.looksLikeInstruction(phrase), phrase)
-        }
-    }
-
-    func testPlainTextIsTyped() {
-        // Text that starts with a verb ("see you soon") goes to Claude, which knows you're typing and types it.
-        for phrase in ["I'm fine, thanks", "how are you doing today", "Thanks for coming yesterday", "We need a new line of products",
-                       "the meeting moved to Friday", "it's raining here"] {
-            XCTAssertFalse(parser.looksLikeInstruction(phrase), phrase)
-        }
-    }
-}
 
 final class NoiseTests: XCTestCase {
     /// Real transcripts of coughs, sniffles, and background speech from a session.
@@ -397,5 +359,70 @@ final class WatcherLabelTests: XCTestCase {
             XCTAssertEqual(ScreenText.normalizedLabel(seen), "yes", seen)
         }
         XCTAssertNotEqual(ScreenText.normalizedLabel("Yes, allow all edits during this session"), "yes")
+    }
+}
+
+final class WritingTests: XCTestCase {
+    let parser = CommandParser(apps: ["Notes", "Google Chrome"])
+
+    /// Writing requests go whole to the writing model: it decides what's text and what's an instruction.
+    func testTypingRequestsGoToTheWritingModel() {
+        XCTAssertEqual(parser.plan("type heading as Introduction"), [.edit("type heading as Introduction")])
+        XCTAssertEqual(parser.plan("type how are you, new paragraph, I'm fine"), [.edit("type how are you, new paragraph, I'm fine")])
+        // An instant command after it still splits off.
+        XCTAssertEqual(parser.plan("type hello. Then open Chrome").last, .openApp("Google Chrome"))
+    }
+
+    func testDictationModeCleanup() {
+        XCTAssertEqual(CommandParser.dictation("How are you? New line. I'm fine, um, thanks"), "How are you?\nI'm fine, thanks")
+        XCTAssertEqual(CommandParser.dictation("We need a new line of products"), "We need a new line of products")
+    }
+
+    func testPlanParsing() {
+        let reply = #"{"ops":[{"op":"insert","text":"Introduction"},{"op":"format","style":"heading"}]}"#
+        let plan = EditorBrain.plan(from: reply)
+        XCTAssertEqual(plan.ops.count, 2)
+        XCTAssertEqual(plan.ops[1]["style"] as? String, "heading")
+    }
+}
+
+final class TextLocatingTests: XCTestCase {
+    let text = "Meeting notes\nWe agreed on the budget. Next steps are unclear. The budget is fine."
+
+    func testFindsQuotedTextNearestTheCaret() {
+        let caret = (text as NSString).length
+        let near = TextEditor.locate("budget", in: text, near: caret)
+        XCTAssertEqual(near.map { (text as NSString).substring(with: $0) }, "budget")
+        XCTAssertGreaterThan(near?.location ?? 0, 60, "the second 'budget' is nearer the end")
+        XCTAssertLessThan(TextEditor.locate("budget", in: text, near: caret, occurrence: "first")?.location ?? 99, 50)
+    }
+
+    func testToleratesSpeechSpacingAndCase() {
+        let found = TextEditor.locate("next steps are  unclear", in: text, near: 0)
+        XCTAssertEqual(found.map { (text as NSString).substring(with: $0) }, "Next steps are unclear")
+        XCTAssertNil(TextEditor.locate("not in the text", in: text, near: 0))
+    }
+}
+
+final class TidyDeleteTests: XCTestCase {
+    func testRemovingAWordLeavesCleanSpacing() {
+        let text = "We agreed on the budget. Done"
+        let ns = text as NSString
+        let tidy = TextEditor.tidy(ns.range(of: "the budget"), in: text)
+        XCTAssertEqual(ns.replacingCharacters(in: tidy, with: ""), "We agreed on. Done")
+        let word = TextEditor.tidy(ns.range(of: "agreed"), in: text)
+        XCTAssertEqual(ns.replacingCharacters(in: word, with: ""), "We on the budget. Done")
+    }
+}
+
+final class StuckTypingTests: XCTestCase {
+    /// Said while in writing mode in a real session; every one of these was typed instead of done.
+    func testCommandsInsideSpeechAreFound() {
+        let parser = CommandParser(apps: ["Google Chrome", "Notes"])
+        for phrase in ["Okay. Open Chrome", "open YouTube here", "No open YouTube here", "Don't type but open the YouTube", "New tab"] {
+            let clauses = parser.parse(phrase)
+            print("•", phrase, "→", clauses.map { "\($0.text): \($0.command.map { "\($0)" } ?? "nil")" })
+            XCTAssertTrue(clauses.contains { $0.command != nil }, phrase)
+        }
     }
 }

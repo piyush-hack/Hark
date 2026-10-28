@@ -148,6 +148,9 @@ public enum Command: Equatable, Sendable {
     /// "close it / close this": the current tab in a browser, otherwise the front window.
     case closeCurrent
     case stop
+    /// Anything about text — writing, selecting, cutting, deleting, moving the cursor, formatting — however it's
+    /// phrased. A fast model reads the field's text and plans exact edits (`TextEditor`).
+    case edit(String)
     case agent(String)
 
     /// True when the command synthesizes keystrokes and must wait until the hotkey is released.
@@ -164,7 +167,7 @@ public enum Command: Equatable, Sendable {
     /// True when the command takes free text that a mid-sentence pause could cut short.
     public var isOpenEnded: Bool {
         switch self {
-        case .webSearch, .searchHere, .click, .schedule, .recurring, .claude, .agent, .openURL, .watch: return true
+        case .webSearch, .searchHere, .click, .schedule, .recurring, .claude, .agent, .edit, .openURL, .watch: return true
         default: return false
         }
     }
@@ -240,6 +243,7 @@ public enum Command: Equatable, Sendable {
         case .stopWatching: return "Stop watching"
         case .closeCurrent: return "Close it"
         case .stop: return "Stop"
+        case .edit(let t): return t
         case .agent(let t): return t
         }
     }
@@ -257,7 +261,7 @@ public enum Command: Equatable, Sendable {
         case .downloadCurrent: return "Downloading"
         case .openResult(let n): return n == 1 ? "Opening the first result" : "Opening result \(n)"
         case .say, .watch, .stopWatching: return nil
-        case .system(.lockScreen, _), .tellTime, .tellDate, .stop, .wait, .agent: return nil
+        case .system(.lockScreen, _), .tellTime, .tellDate, .stop, .wait, .agent, .edit: return nil
         default: return title
         }
     }

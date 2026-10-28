@@ -27,7 +27,7 @@ public final class ClaudeBrain {
     public init() {}
 
     /// The newest Claude Code binary: standalone installs first, then the VS Code / Cursor extension.
-    public static var binary: URL? {
+    nonisolated public static var binary: URL? {
         let fm = FileManager.default
         let home = Paths.home.path
         for path in ["\(home)/.local/bin/claude", "\(home)/.claude/local/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]

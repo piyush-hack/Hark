@@ -17,10 +17,8 @@ public struct HarkSettings: Codable, Equatable, Sendable {
     public var claudeProjectDirectory: String?
     public var preferredBrowser: String?
     public var dictationEnabled = true
-    /// A soft tick-tick when Hark needs you: a finished request, a question, a reminder or alert.
-    public var attentionSound = true
-    /// Seconds between repeats until you notice; 0 = tick once.
-    public var attentionInterval = 5
+    /// Hands-free only obeys your voice (learned from what you say while holding ⌥⌘).
+    public var voiceMatch = true
     /// Auto mode: sensitive actions (send, delete, buy, risky shell commands) run without asking.
     public var autoApprove = false
     public var onboardingDone = false
@@ -48,8 +46,7 @@ public struct HarkSettings: Codable, Equatable, Sendable {
         preferredBrowser = try c.decodeIfPresent(String.self, forKey: .preferredBrowser)
         dictationEnabled = try c.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? defaults.dictationEnabled
         autoApprove = try c.decodeIfPresent(Bool.self, forKey: .autoApprove) ?? defaults.autoApprove
-        attentionSound = try c.decodeIfPresent(Bool.self, forKey: .attentionSound) ?? defaults.attentionSound
-        attentionInterval = try c.decodeIfPresent(Int.self, forKey: .attentionInterval) ?? defaults.attentionInterval
+        voiceMatch = try c.decodeIfPresent(Bool.self, forKey: .voiceMatch) ?? defaults.voiceMatch
         onboardingDone = try c.decodeIfPresent(Bool.self, forKey: .onboardingDone) ?? defaults.onboardingDone
         urlKey = try c.decodeIfPresent(String.self, forKey: .urlKey) ?? defaults.urlKey
     }

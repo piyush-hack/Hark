@@ -31,8 +31,6 @@ public struct CommandParser {
         for (index, clause) in clauses.enumerated() {
             if let command = clause.command {
                 commands.append(command)
-            } else if let typed = continuedTyping(clause.text, after: commands.last) {
-                commands.append(typed)
             } else {
                 let rest = clauses[index...].map(\.text).joined(separator: ", ")
                 commands.append(.agent(rest))
@@ -53,7 +51,7 @@ public struct CommandParser {
                 // Not an instant command. If you've already moved on to the next command, it's complete:
                 // more text to type, or a request for the brain, so it doesn't block everything after it.
                 if isLast { break }
-                ready.append(continuedTyping(clauses[index].text, after: ready.last) ?? .agent(clauses[index].text))
+                ready.append(.agent(clauses[index].text))
                 index += 1
                 continue
             }
@@ -66,23 +64,11 @@ public struct CommandParser {
         return (ready, remainder)
     }
 
-    /// Right after typing, a clause that isn't a command or an instruction is more text to type.
-    private func continuedTyping(_ clause: String, after previous: Command?) -> Command? {
-        guard case .typeText = previous, let typed = textToType(clause) else { return nil }
-        return .typeText(typed)
-    }
-
-    /// What to type for speech heard while writing, or nil when it's an instruction: line breaks become "\n", and the
-    /// words left over decide ("new paragraph, I'm fine" types; "new paragraph, make it bold" is an instruction).
-    public func textToType(_ speech: String) -> String? {
-        let typed = Self.dictation(speech)
-        let words = typed.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-        return words.isEmpty || !looksLikeInstruction(words) ? typed : nil
-    }
-
     /// Open-ended commands that can run at a pause because a continuation can refine them
     /// ("search for best ramen" … "in Tokyo" re-runs the search with the full query).
     static func safeToRunEarly(_ command: Command) -> Bool {
+        // Plain words to type go in the moment the phrase is heard; anything that might be an instruction waits.
+        if case .edit(let request) = command { return plainText(request) != nil }
         if case .webSearch(let query, _) = command { return query.split(separator: " ").count >= 2 }
         if case .searchHere(let query) = command { return query.split(separator: " ").count >= 2 }
         return false
@@ -173,6 +159,8 @@ public struct CommandParser {
         if l.matches(#"^(?:tell|ask|have|get) (?:claude|cloud|claud)\b"#) || l.matches(#"^(?:claude|claud) code\b"#) {
             return .untilInstantCommand
         }
+        // "type how are you, new paragraph, I'm fine" is one request for the writing model.
+        if l.matches(#"^(?:type|write|dictate)\b"#) { return .untilInstantCommand }
         return nil
     }
 
@@ -219,6 +207,10 @@ public struct CommandParser {
                        "please ", "can you ", "could you ", "would you ", "will you ", "i want you to ", "i'd like you to ",
                        "go ahead and ", "just ", "i am saying ", "i'm saying ", "i said ", "i mean ", "what i mean is ",
                        "basically ", "so basically ", "listen ", "listen, ", "actually ", "actually, ", "now ", "and "]
+        // Corrections lead with what not to do: "no, open YouTube", "don't type but open the YouTube" → the request.
+        s = s.replacingOccurrences(of: #"^(?i:(?:no|nope|nah|wait|sorry|not that|not this)[,.!]?\s+(?:no[,.!]?\s+)*|(?:don'?t|do not)\s+(?:\w+\s+){0,3}?(?:but|just)[,]?\s+|i said[,]?\s+)"#,
+                                   with: "", options: .regularExpression)
+        lower = s.lowercased()
         var changed = true
         while changed {
             changed = false
@@ -243,7 +235,6 @@ public struct CommandParser {
         guard !l.isEmpty else { return nil }
         let o = String(original.prefix(l.count))
 
-        if let c = Self.parseDictation(l) { return c }
         if let c = parseWatch(l, o) { return c }
         if let c = parseControl(l) { return c }
         if let c = parseChat(l, o) { return c }
@@ -435,15 +426,10 @@ public struct CommandParser {
         if text == nil, l.matches(#"^write (?:in it|into it|in there|in here|there|here|down|this)\b"#) {
             text = String(o.dropFirst(6))
         }
-        guard var typed = text?.trimmingCharacters(in: CharacterSet(charactersIn: ".,:; ")) else { return nil }
-        if let first = typed.first, typed.count > 1, o.range(of: #"(?i:type in|type)[.:]\s"#, options: .regularExpression) != nil {
-            typed = first.uppercased() + typed.dropFirst()  // "Type in. hello" → "Hello"
-        }
-        // "write in it, how are you" / "type there: hello" — the place words aren't part of the text.
-        typed = typed.replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|there|here|it|this|in the note|in the document|in the box|in the field)\s*[,:]?\s+"#,
-                                           with: "", options: .regularExpression)
-        typed = Self.dictation(typed)
-        return typed.isEmpty ? nil : .typeText(typed)
+        guard let typed = text?.trimmingCharacters(in: CharacterSet(charactersIn: ".,:; ")), !typed.isEmpty else { return nil }
+        // What to write and how ("type heading as Introduction", "write thanks in bold") is the writing model's call:
+        // it gets the whole request, words like "type" and "in it" included.
+        return .edit(o.trimmingCharacters(in: .whitespaces))
     }
 
     // MARK: Dictation
@@ -452,16 +438,6 @@ public struct CommandParser {
     static let breakLead = #"(?:(?:go|move|jump|skip)\s+to|start|create|make|add|insert|begin|put|open|in|on|onto)\s+(?:a\s+|an\s+|the\s+)?"#
     static let breakUnit = #"(?:new|next|another|fresh)\s+(line|paragraph)"#
     static let fillerWords = #"\b(?:uh+|um+|erm|uhm)\b[,.]?\s*"#
-
-    /// A whole clause that is only a formatting instruction while writing: a line break, a paragraph break,
-    /// or a cue like "start typing". Typed as text ("\n"), so it never sends a chat message the way Return would.
-    static func parseDictation(_ clause: String) -> Command? {
-        let l = clause.replacingOccurrences(of: fillerWords, with: "", options: [.regularExpression, .caseInsensitive])
-            .trimmingCharacters(in: .whitespaces.union(.punctuationCharacters))
-        if l.matches(#"^(?:(?:now|then|okay|ok|and)\s+)?(?:start|keep|continue|resume|go on)\s+(?:typing|writing|dictating)$"#) { return .typeText("") }
-        guard let m = l.firstMatch("^(?i:(?:now|then|and)\\s+)?(?:" + breakLead + ")?" + breakUnit + "(?:\\s+(?:please|now))?$") else { return nil }
-        return .typeText(m[1].lowercased() == "paragraph" ? "\n\n" : "\n")
-    }
 
     /// Cleans typed speech: line/paragraph instructions become breaks, "uh"/"um" disappear, "start typing" cues go.
     /// A bare "new line" only counts as its own sentence, so "a new line of products" stays text.
@@ -490,32 +466,25 @@ public struct CommandParser {
         return s.trimmingCharacters(in: .whitespaces)
     }
 
-    /// While writing, is this an instruction about the text rather than more text? Phrased any way:
-    /// - it's worded as a command (starts with a verb: "put a gap here", "bold that", "get rid of the last bit"), or
-    /// - it's a short phrase about the text's layout or the cursor ("one more blank line", "the previous word", "next row").
-    /// Instructions go to Claude, which knows you're typing; plain sentences are typed instantly.
-    public func looksLikeInstruction(_ text: String) -> Bool {
-        let cleaned = Self.normalize(text).trimmingCharacters(in: .whitespaces.union(.punctuationCharacters))
-        let words = cleaned.lowercased().split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
-        guard let first = words.first(where: { !Self.connectors.contains($0) }) else { return false }
-        if ["type", "write", "dictate"].contains(first) { return false }
-        if Self.strongVerbs.contains(first) || Self.startsWithVerb(cleaned) { return true }
-        let aboutLayout = #"\b(?:lines?|paragraphs?|rows?|spaces?|gaps?|tabs?|indent\w*|bullets?|headings?|titles?|cursor|caret|bold|italics?|underline\w*|capitals?|caps|upper ?case|lower ?case|full stop|comma|colon|quotes?|brackets?|(?:last|previous|next|first) (?:word|sentence|letter|character|bit)|above|below|beginning|top|bottom)\b"#
-        // "We need a new line of products" has a subject: a sentence to type, not an instruction.
-        let subjects: Set<String> = ["i", "i'm", "i'll", "i've", "we", "we're", "you", "you're", "he", "she", "they", "it", "it's", "this", "there", "that's"]
-        return words.count <= 8 && !subjects.contains(first) && cleaned.lowercased().matches(aboutLayout)
-    }
-
     /// Not a request: a cough or sniffle comes out of the speech model as "Mm." or "Uh", a "yeah" or "mm-hmm" is you
     /// talking to someone else, and background chatter arrives as stray fragments ("Peace.", "Can I").
+    static let backchannel: Set<String> = ["uh", "uhh", "um", "umm", "uhm", "erm", "mm", "mmm", "hmm", "hm", "mhm", "mm-hmm", "uh-huh",
+                                           "hmm-hmm", "ah", "oh", "eh", "huh", "yeah", "yep", "yup", "ya", "yes", "no", "nope", "okay", "ok",
+                                           "right", "sure", "hey", "hi", "hello", "wow", "oops", "peace", "bye", "thanks", "cool", "nice",
+                                           "alright", "so", "well"]
+
+    /// Only fillers ("uh", "mm-hmm", "okay"). While you're writing, short real words ("are you okay") are content.
+    public static func isFiller(_ text: String) -> Bool {
+        let words = text.lowercased().components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'-")).inverted)
+            .filter { !$0.isEmpty }
+        return words.allSatisfy(backchannel.contains)
+    }
+
     public static func isNoise(_ text: String) -> Bool {
         let words = text.lowercased().components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'-")).inverted)
             .filter { !$0.isEmpty }
         guard words.count > 1 else { return true }
-        let backchannel: Set<String> = ["uh", "uhh", "um", "umm", "uhm", "erm", "mm", "mmm", "hmm", "hm", "mhm", "mm-hmm", "uh-huh", "hmm-hmm",
-                                        "ah", "oh", "eh", "huh", "yeah", "yep", "yup", "ya", "yes", "no", "nope", "okay", "ok", "right", "sure",
-                                        "hey", "hi", "hello", "wow", "oops", "peace", "bye", "thanks", "cool", "nice", "alright", "so", "well"]
-        if words.allSatisfy(backchannel.contains) { return true }
+        if words.allSatisfy(Self.backchannel.contains) { return true }
         guard words.count <= 3 else { return false }
         // A short fragment needs something to act on: a real verb, noun, adjective, or number — not "can", "is", "I".
         let auxiliaries: Set<String> = ["can", "could", "would", "should", "will", "shall", "may", "might", "must", "do", "does", "did",
@@ -526,24 +495,41 @@ public struct CommandParser {
         var content = false
         tagger.enumerateTags(in: sentence.startIndex..<sentence.endIndex, unit: .word, scheme: .lexicalClass, options: [.omitWhitespace, .omitPunctuation]) { tag, range in
             let word = String(sentence[range])
-            if [.noun, .verb, .adjective, .number].contains(tag), !auxiliaries.contains(word), !backchannel.contains(word) { content = true; return false }
+            if [.noun, .verb, .adjective, .number].contains(tag), !auxiliaries.contains(word), !Self.backchannel.contains(word) { content = true; return false }
             return true
         }
         return !content
     }
 
-    /// Imperative sentences start with a verb in its base form; Apple's on-device tagger tells which words are verbs.
-    static func startsWithVerb(_ text: String) -> Bool {
-        let tagger = NLTagger(tagSchemes: [.lexicalClass])
-        tagger.string = text
-        var first: NLTag?
-        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .lexicalClass,
-                             options: [.omitWhitespace, .omitPunctuation]) { tag, _ in
-            first = tag
-            return false
-        }
-        return first == .verb
+    /// The words to type when a writing request is plainly just words: "type hello, how are you" → "hello, how are
+    /// you", or (while writing) "see you at six" → itself. Nil whenever any word could be an instruction about layout,
+    /// formatting, position, or editing ("heading as", "in bold", "new line", "delete", "instead") — the writing
+    /// model decides those. This only picks the instant path; it never decides what an instruction means.
+    public static func plainText(_ request: String) -> String? {
+        // Only an explicit "type …" is typed without asking the model. Speech that just follows ("next item",
+        // "in the next line") could be an instruction in any wording, so the model decides that.
+        guard let m = request.trimmingCharacters(in: .whitespacesAndNewlines)
+            .firstMatch(#"^(?i:type in|type into|type out|type|dictate|write down|write in it|write into it|write in there|write here|write)[.:,]?\s+(.+)$"#) else { return nil }
+        var text = m[1]
+        text = text.replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|there|here|this)\s*[,:]?\s+"#, with: "", options: .regularExpression)
+        text = dictation(text)
+        guard !text.isEmpty, !text.contains("\n") else { return nil }
+        let words = Set(text.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty })
+        return words.isDisjoint(with: instructionWords) ? text : nil
     }
+
+    /// Words that can turn a sentence into an instruction about the text. Broad on purpose.
+    static let instructionWords: Set<String> = [
+        "heading", "headings", "title", "subtitle", "subheading", "bold", "italic", "italics", "underline", "underlined",
+        "strikethrough", "bullet", "bullets", "bulleted", "list", "numbered", "checklist", "checkbox", "paragraph",
+        "paragraphs", "line", "lines", "newline", "cursor", "caret", "select", "selection", "highlight", "delete", "remove",
+        "erase", "cut", "copy", "paste", "replace", "undo", "redo", "capital", "capitalize", "caps", "uppercase", "lowercase",
+        "font", "format", "formatting", "indent", "tab", "space", "spaces", "comma", "period", "colon", "semicolon", "quote",
+        "quotes", "bracket", "brackets", "parenthesis", "emoji", "above", "below", "beginning", "previous", "word", "words",
+        "sentence", "sentences", "letter", "character", "as", "instead", "into", "press", "enter", "return", "hit", "key",
+        "search", "google", "find", "move", "go", "put", "insert", "add", "change", "fix", "correct", "make", "rewrite",
+        "translate", "summarize", "shorter", "longer", "formal", "bigger", "smaller",
+    ]
 
     /// A phrase cut off at "create a" / "go to the" isn't finished; wait for the rest before acting on it.
     public static func endsMidThought(_ text: String) -> Bool {
@@ -709,6 +695,9 @@ public struct CommandParser {
         guard let m = l.firstMatch(#"^(?:open|launch|start|run|fire up|bring up|switch to|go to|show|focus|activate|visit|navigate to|take me to)(?: up)? (.+)$"#) else { return nil }
         var target = m[1].trimmingCharacters(in: .whitespaces.union(.punctuationCharacters))
         for prefix in ["the ", "my ", "a "] where target.hasPrefix(prefix) { target.removeFirst(prefix.count) }
+        // "open YouTube here / in this tab / instead": where, not what.
+        target = target.replacingOccurrences(of: #"\s+(?:right )?(?:here|in here|over here|in this tab|in the same tab|in this window|instead|please)$"#,
+                                            with: "", options: .regularExpression)
         for suffix in [" website", " site", " web site", " page", " homepage", " home page"] where target.hasSuffix(suffix) && Self.sites[String(target.dropLast(suffix.count))] != nil {
             target.removeLast(suffix.count)
         }
@@ -730,6 +719,8 @@ public struct CommandParser {
     }
 
     private func parseClick(_ l: String, _ o: String) -> Command? {
+        // "select the second paragraph" is about text; in no text field it falls back to clicking (see runEditor).
+        if l.matches(#"^(?:select|highlight)\b"#) { return .edit(o.trimmingCharacters(in: .whitespaces)) }
         guard let m = o.firstMatch(#"^(?i:click|tap|press|select|hit|choose)(?i: on)?(?i: the)? (.+?)(?i: button| link| tab| option| icon| menu)?$"#) else { return nil }
         let target = m[1].trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
         return target.isEmpty ? nil : .click(target)

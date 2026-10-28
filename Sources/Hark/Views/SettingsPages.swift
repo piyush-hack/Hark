@@ -227,25 +227,45 @@ struct VoicePage: View {
     @EnvironmentObject var engine: HarkEngine
 
     var body: some View {
-        PageScaffold(title: "Speech & Sound", subtitle: "How Hark hears you, and how it gets your attention. Answers show up as text on the island — Hark never talks.") {
+        PageScaffold(title: "Speech", subtitle: "How Hark hears you. Answers show up as text on the island, with one soft tick-tick when something's done.") {
+            VoiceMatchCard()
             VocabularyCard()
             Card {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("Tick-tick when Hark needs you", isOn: $engine.settings.attentionSound)
-                    Picker("Repeat", selection: $engine.settings.attentionInterval) {
-                        Text("Every 5 seconds").tag(5)
-                        Text("Every 10 seconds").tag(10)
-                        Text("Every 20 seconds").tag(20)
-                        Text("Every 30 seconds").tag(30)
-                        Text("Every minute").tag(60)
-                        Text("Only once").tag(0)
+                Toggle("Hold ⌃⌥ to dictate text", isOn: $engine.settings.dictationEnabled)
+            }
+        }
+    }
+}
+
+struct VoiceMatchCard: View {
+    @EnvironmentObject var engine: HarkEngine
+
+    private var ready: Bool { engine.voiceSamples >= VoiceID.samplesNeeded }
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Toggle(isOn: $engine.settings.voiceMatch) {
+                        Label("Only obey my voice in hands-free", systemImage: "person.wave.2.fill").font(.system(size: 14, weight: .semibold))
                     }
-                    .frame(maxWidth: 300)
-                    .disabled(!engine.settings.attentionSound)
-                    Text("Ticks when a request finishes, Hark asks you something, or a reminder or alert arrives. Long tasks, Claude's answers, questions, and alerts repeat until you look at the island, press ⌥⌘, speak, or tap the bell on the island to mute that one. Quick commands tick once.")
-                        .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    Divider()
-                    Toggle("Hold ⌃⌥ to dictate text", isOn: $engine.settings.dictationEnabled)
+                    .toggleStyle(.switch)
+                    Spacer()
+                    if engine.settings.voiceMatch {
+                        StatusPill(text: ready ? "Knows your voice" : "Learning \(engine.voiceSamples)/\(VoiceID.samplesNeeded)",
+                                   color: ready ? .green : .orange)
+                    }
+                }
+                Text(ready
+                     ? "In hands-free, people talking near you are ignored. Hark keeps learning your voice whenever you hold ⌥⌘, so a cold or a new mic is fine. Everything stays on this Mac."
+                     : "Hark learns your voice from what you say while holding ⌥⌘ — or teach it now in about 15 seconds. Until then, hands-free listens to everyone.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button(engine.learningVoice ? "Listening — keep talking…" : (ready ? "Teach it again" : "Teach my voice")) { engine.learnVoice() }
+                        .disabled(engine.learningVoice || !engine.settings.voiceMatch)
+                    if engine.voiceSamples > 0 {
+                        Button("Forget my voice") { engine.forgetVoice() }
+                    }
                 }
             }
         }

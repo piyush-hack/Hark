@@ -12,7 +12,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .commands: return "What to Say"
         case .automations: return "Automations"
         case .intelligence: return "Intelligence"
-        case .voice: return "Speech & Sound"
+        case .voice: return "Speech"
         case .permissions: return "Permissions"
         case .about: return "About"
         }

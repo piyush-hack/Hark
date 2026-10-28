@@ -102,6 +102,25 @@ case "agent":
         print(String(format: "“%@” → (%.1fs) %@", request, Date().timeIntervalSince(start), answer))
     }
 
+case "voiceid":
+    // harkctl voiceid <your-voice-dir> <other files…>: learns from the dir, prints how each file matches.
+    let voice = VoiceID(file: nil)
+    let started = Date()
+    try await voice.prepare()
+    print(String(format: "model ready in %.1fs", Date().timeIntervalSince(started)))
+    guard let dir = rest.first else { print("usage: harkctl voiceid <your-voice-dir> <files…>"); break }
+    let enroll = ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).filter { $0.hasSuffix(".wav") }.sorted()
+    for name in enroll { await voice.learn(try AudioFile.load(URL(fileURLWithPath: dir).appendingPathComponent(name))) }
+    print("learned from \(await voice.progress.samples) phrases")
+    for path in rest.dropFirst() {
+        let audio = try AudioFile.load(URL(fileURLWithPath: path))
+        let t = Date()
+        let score = await voice.match(audio)
+        print(String(format: "%@  match %@  (%.0f ms)", (path as NSString).lastPathComponent,
+                     score.map { String(format: "%.2f %@", $0, $0 >= VoiceID.threshold ? "YOU" : "other") } ?? "too short",
+                     Date().timeIntervalSince(t) * 1000))
+    }
+
 case "text":
     let text = AX.windowText(appName: rest.first ?? "Notes")
     print("trusted: \(AX.isTrusted()) · \(text.count) chars")

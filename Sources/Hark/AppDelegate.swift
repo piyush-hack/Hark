@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Keep the ears ready so even the first ⌥⌘ press acts as you speak (≈600 MB; can sleep in Intelligence settings).
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { Task.detached(priority: .utility) { try? await Transcriber.shared.prepare() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in Task { await self?.engine.prepareVoiceMatch() } }
 
         permissions.refresh()
         if !engine.settings.onboardingDone || !permissions.essentialsGranted {
