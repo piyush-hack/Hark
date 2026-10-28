@@ -20,9 +20,11 @@
 - **Push-to-talk, anywhere.** Hold <kbd>⌥</kbd><kbd>⌘</kbd> in any app. Release to finish. Or tap <kbd>⌥</kbd><kbd>⌘</kbd> once for hands-free: Hark keeps listening and acting, request after request, until you tap again. Hold <kbd>⌃</kbd><kbd>⌥</kbd> to dictate text into whatever field is focused.
 - **Acts while you're still talking.** “Open Chrome… new tab… search for the best ramen in Tokyo” — Chrome opens after the first pause, not after you finish.
 - **Writes like dictation.** “Type how are you … new paragraph … I’m fine” types the text and the breaks. While writing, “new line”, “go to a new paragraph” or “in the next line” are formatting, “uh/um” are dropped, and anything that starts like a command (“delete that word”) is done, not typed.
+- **Any Claude model, and your connectors.** Pick Fable, Opus, Sonnet, or Haiku (or an exact model name) for the brain and for the writing model. Switch on the MCP connectors on your Claude account (Gmail, Calendar, Drive, ClickUp, your own) and Hark uses them for requests they can do directly, in a session kept warm so repeat requests take seconds.
+- **Gets faster at things it has done.** When Claude works out how to do something here (the button that deletes a note, the menu that changes a font) and confirms on screen that it worked, Hark saves the how-to. Similar requests later start from it instead of exploring. How-tos that stop working are dropped. See and delete them in Settings → Intelligence.
 - **Only obeys you.** In hands-free, Hark checks each phrase against your voiceprint (WeSpeaker on the Neural Engine, ~30 ms, on-device) and ignores people talking nearby. It learns your voice from what you say while holding ⌥⌘, or in a 15-second “Teach my voice” session.
 - **Hears through noise.** Apple's voice isolation cleans the mic, then NVIDIA Parakeet (on the Neural Engine) transcribes. A 10-second sentence takes under a second.
-- **Instant for the common stuff, smart for the rest.** A rule-based parser handles apps, tabs, search, typing, keys, clicks, scrolling, volume, media, dark mode, reminders — with zero model latency. Anything else goes to the brain: **Claude through the Claude Code CLI you're signed in to** (no API key, no extra cost, ~3 s, remembers the conversation). The brain sees your screen and Hark's tools and answers with a JSON plan that Hark executes, looping when it needs to look at results.
+- **Instant for the common stuff, smart for the rest.** A rule-based parser handles apps, tabs, search, typing, keys, clicks, scrolling, volume, media, dark mode, reminders — with zero model latency. Anything else goes to the brain: **Claude through the Claude Code CLI you're signed in to** (no API key, no extra cost, ~3 s, remembers the conversation). Hark's abilities are an MCP server that Claude Code calls like any other tool, next to your own MCP servers; Claude runs the loop itself, looking at the screen whenever it needs to.
 - **Sees your screen.** Claude gets a screenshot plus the front window's Accessibility tree, the current browser tab via AppleScript, and on-device OCR as a fallback.
 - **Knows what you're pointing at.** Say “what's in this section?” or “summarize what's around my cursor” — Hark outlines the area under the pointer and sends Claude a close-up of it, its text, and any selection.
 - **Quiet by design.** Answers, reminders, and alerts appear on the floating island as text — never spoken. Long answers scroll instead of being cut off; reminders and alerts stay until you close them.
@@ -81,7 +83,7 @@ Chain freely with “then” and “and”. Say “stop” to cancel.
               ▼
         CommandParser ──── instant commands ───► Executor ─► AppleScript · Accessibility · CGEvent · NSWorkspace
               │                                     ▲
-              └── anything it can't parse ──► Claude (via Claude Code CLI) ── JSON plan ──► Executor
+              └── anything it can't parse ──► Claude Code session ── MCP tool calls ──► Executor
                                                     │
                                               read_screen · click · type · web_search · run_shell · schedule …
               ▼
@@ -89,7 +91,7 @@ Chain freely with “then” and “and”. Say “stop” to cancel.
 ```
 
 - **Streaming plan.** While you hold the keys, each finished phrase is parsed. Commands with a fixed meaning (“open Chrome”, “new tab”) run immediately; open-ended ones (“search for…”, “type…”) wait for the next phrase so a mid-sentence pause can't cut them short. Keystroke commands wait until you release <kbd>⌥</kbd><kbd>⌘</kbd> so your held modifiers never mix in.
-- **A brain that costs nothing to keep around.** Requests the parser can't handle go to Claude through `claude -p` (your existing sign-in). Claude gets the request, the front app, recent instant actions, and Hark's tool list, and answers with `{"steps":[…], "continue":…, "say":…}`. Hark runs the steps; with `continue`, it sends results back for the next plan. Sessions resume for ten minutes so follow-ups like “open its docs” work. Nothing is loaded on your Mac.
+- **A brain that costs nothing to keep around.** Requests the parser can't handle go to one Claude Code session kept open (your existing sign-in, `claude -p` with stream-json). Hark serves its tools over MCP on 127.0.0.1 with a per-launch secret; Claude gets the request, a screenshot, and the context, and calls Hark's tools (and your other MCP servers) in its own loop until it's done. Follow-ups like “open its docs” share the session.
 - **Safety rails.** Shell commands that delete, move, push, or use `sudo`, and clicks on Send/Delete/Buy/Pay, need a “yes” — Hark listens for it right away, or click Yes / “Yes, don’t ask again” on the island. Auto mode (menu bar → Auto-Approve Sensitive Actions) skips the question entirely. Watcher clicks only land inside the watched area of the watched app.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and extension points.
@@ -117,6 +119,7 @@ scripts/             build-app.sh, make-icon.swift, dev-signing.sh
 make test                                   # unit tests
 make cli && .build/release/harkctl parse "open chrome, new tab and search for ramen"
 open -g "hark://run?key=$KEY&text=open%20chrome"   # drive the running app; key is on the About page / settings.json
+open -g "hark://edit?key=$KEY&ops=[…]"              # raw edit steps, logging the field after each (how an editor behaves)
 .build/release/harkctl listen clip.wav      # stream a recording through VAD + parser like the live mic
 .build/release/harkctl agent "summarize this page" --dry   # Claude plans with simulated tools
 .build/release/harkctl run "set the volume to 20 percent"  # really do it

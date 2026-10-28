@@ -256,7 +256,9 @@ struct HUDView: View {
                         .padding(.top, 2)
                     // The whole answer: as tall as it needs up to most of the screen, then it scrolls.
                     FittedScroll(maxHeight: maxReplyHeight) {
-                        Text(engine.reply)
+                        // Claude's light formatting (bold, italics, links) shows as formatting, not asterisks.
+                        Text((try? AttributedString(markdown: engine.reply, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+                             ?? AttributedString(engine.reply))
                             .font(.system(size: 13.5))
                             .lineSpacing(2)
                             .foregroundStyle(.white.opacity(0.88))

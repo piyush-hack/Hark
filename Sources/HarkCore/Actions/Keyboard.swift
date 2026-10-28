@@ -41,21 +41,90 @@ public enum Keyboard {
         usleep(12_000)
     }
 
-    /// Types text by pasting it, then restores the clipboard. Fast and safe for any Unicode.
+    /// Shift pressed and released on its own: changes nothing, but it's keyboard input — Chrome ignores ⌘V after
+    /// Accessibility moves its cursor or selection until some key event arrives.
+    public static func tapShift() {
+        let source = CGEventSource(stateID: .hidSystemState)
+        for down in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Shift), keyDown: down) else { continue }
+            event.type = .flagsChanged
+            event.flags = down ? .maskShift : []
+            event.post(tap: .cghidEventTap)
+            usleep(15_000)
+        }
+    }
+
+    /// Types text as key events that carry the characters (no clipboard), a few characters per event.
+    public static func typeKeys(_ text: String) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        var chunks: [[UniChar]] = [[]]
+        for character in text {
+            let units = Array(String(character).utf16)
+            if chunks[chunks.count - 1].count + units.count > 16 { chunks.append([]) }
+            chunks[chunks.count - 1] += units
+        }
+        for chunk in chunks where !chunk.isEmpty {
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down)
+                event?.flags = []  // never ⌘-anything, whatever is held
+                event?.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk)
+                event?.post(tap: .cghidEventTap)
+            }
+            usleep(8_000)
+        }
+    }
+
+    /// Types text as key events with line breaks as ⇧↩, which is a new line in web editors where ↩ alone would send
+    /// (WhatsApp, Slack). Doesn't touch the clipboard. Web editors take these reliably; ⌘V pastes often don't land.
+    public static func typeLines(_ text: String) throws {
+        for (index, line) in text.components(separatedBy: "\n").enumerated() {
+            if index > 0 { try press(KeyCombo(key: "return", shift: true)) }
+            if !line.isEmpty { typeKeys(line) }
+        }
+    }
+
+    /// Your clipboard from before Hark started pasting; it comes back once Hark's pastes are over.
+    @MainActor private static var heldClipboard: [NSPasteboardItem]?
+    /// The clipboard's change count right after Hark's latest paste.
+    @MainActor private static var lastPaste = -1
+
+    /// Types text by pasting it. Fast and safe for any Unicode. Your clipboard comes back a moment later, not at once:
+    /// web apps (WhatsApp, Slack, Chrome) read a paste asynchronously and would otherwise paste the old contents, or
+    /// nothing. If you copy something in the meantime, that stays.
     @MainActor
     public static func type(_ text: String) async throws {
         let pasteboard = NSPasteboard.general
-        let saved = pasteboard.pasteboardItems?.compactMap { item -> NSPasteboardItem? in
-            let copy = NSPasteboardItem()
-            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
-            return copy
-        } ?? []
+        if heldClipboard == nil || pasteboard.changeCount != lastPaste {
+            heldClipboard = pasteboard.pasteboardItems?.compactMap { item -> NSPasteboardItem? in
+                let copy = NSPasteboardItem()
+                for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+                return copy
+            } ?? []
+        }
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        let mine = pasteboard.changeCount
+        lastPaste = mine
         try press(KeyCombo(key: "v", command: true))
         try await Task.sleep(nanoseconds: 250_000_000)
-        pasteboard.clearContents()
-        if !saved.isEmpty { pasteboard.writeObjects(saved) }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard lastPaste == mine else { return }  // a later paste puts it back
+            defer { heldClipboard = nil }
+            guard pasteboard.changeCount == mine, let saved = heldClipboard else { return }
+            pasteboard.clearContents()
+            if !saved.isEmpty { pasteboard.writeObjects(saved) }
+        }
+    }
+
+    /// What's on your clipboard, as far as you're concerned — not text Hark is in the middle of pasting.
+    @MainActor
+    public static func clipboardString() -> String? {
+        let pasteboard = NSPasteboard.general
+        if pasteboard.changeCount == lastPaste, let held = heldClipboard {
+            return held.lazy.compactMap { $0.string(forType: .string) }.first
+        }
+        return pasteboard.string(forType: .string)
     }
 
     /// Hardware-style media keys (play, next, volume, brightness) so macOS shows its own overlay.
@@ -74,6 +143,22 @@ public enum Keyboard {
     public static let mediaPlay: Int32 = 16, mediaNext: Int32 = 17, mediaPrevious: Int32 = 18
     public static let soundUp: Int32 = 0, soundDown: Int32 = 1, mute: Int32 = 7
     public static let brightnessUp: Int32 = 2, brightnessDown: Int32 = 3
+
+    /// Left (or right) click, single or double, at a screen point (top-left origin).
+    public static func click(at point: CGPoint, right: Bool = false, count: Int) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        let (down, up, button): (CGEventType, CGEventType, CGMouseButton) = right ? (.rightMouseDown, .rightMouseUp, .right) : (.leftMouseDown, .leftMouseUp, .left)
+        CGEvent(mouseEventSource: source, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: button)?.post(tap: .cghidEventTap)
+        usleep(30_000)
+        for n in 1...max(1, count) {
+            for type in [down, up] {
+                let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: button)
+                event?.setIntegerValueField(.mouseEventClickState, value: Int64(n))
+                event?.post(tap: .cghidEventTap)
+                usleep(20_000)
+            }
+        }
+    }
 
     public static func click(at point: CGPoint) {
         let source = CGEventSource(stateID: .hidSystemState)

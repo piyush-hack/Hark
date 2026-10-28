@@ -86,6 +86,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // Opening a URL brings Hark forward; hand focus back so keystrokes land where the user was.
                 lastExternalApp?.activate()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.engine.handle(text: text) }
+            case "edit":
+                // hark://edit?key=…&ops=[…] — raw edit steps, logging the field after each (to learn how an editor behaves).
+                guard key == engine.settings.urlKey, let ops = items.first(where: { $0.name == "ops" })?.value else { continue }
+                lastExternalApp?.activate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in Task { await self?.engine.debugEdit(ops) } }
             case "bench":
                 guard key == engine.settings.urlKey, let dir = items.first(where: { $0.name == "dir" })?.value else { continue }
                 Task { await engine.benchmark(folder: URL(fileURLWithPath: dir)) }

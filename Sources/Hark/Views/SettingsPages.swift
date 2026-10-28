@@ -135,11 +135,10 @@ struct IntelligencePage: View {
                     if engine.brainAvailable {
                         Text("Simple commands run instantly on your Mac. Everything else goes to Claude — no API key, no extra cost, about 3 seconds. Claude sees your request, the front app, and Hark's tools, and replies with a plan Hark carries out.")
                             .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        Picker("Model", selection: $engine.settings.claudeModel) {
-                            Text("Haiku — fastest").tag("haiku")
-                            Text("Sonnet — smartest").tag("sonnet")
-                        }
-                        .frame(maxWidth: 320)
+                        ModelPicker(title: "Brain", selection: $engine.settings.claudeModel)
+                        ModelPicker(title: "Writing", selection: $engine.settings.writerModel)
+                        Text("The brain plans actions from the screen; the writing model turns speech into text edits — keep it fast.")
+                            .font(.system(size: 11.5)).foregroundStyle(.secondary)
                         Text("Uses your Claude plan's usage. Requests and any screen or page text they need are sent to Anthropic.")
                             .font(.system(size: 11.5)).foregroundStyle(.tertiary)
                     } else {
@@ -148,6 +147,7 @@ struct IntelligencePage: View {
                     }
                 }
             }
+            LearnedCard(book: engine.lessonBook)
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle(isOn: $engine.settings.autoApprove) {
@@ -196,8 +196,8 @@ struct VocabularyCard: View {
                 if engine.settings.speechEngine == "parakeet" {
                     Toggle("English-only model (turn off for 25 European languages)", isOn: $engine.settings.englishSpeechModel)
                 }
-                Toggle("Keep my last 20 commands' audio on this Mac to tune recognition to my voice", isOn: $engine.settings.keepRecordings)
-                Text("Saved only in ~/Library/Application Support/Hark/recordings. Turn off to stop; delete the folder anytime.")
+                Toggle("Keep my last 20 commands' audio for troubleshooting", isOn: $engine.settings.keepRecordings)
+                Text("Saves the audio and what Hark heard, so misheard commands can be replayed and checked. It doesn't train anything. Only on this Mac, in ~/Library/Application Support/Hark/recordings; turn off to stop, delete the folder anytime.")
                     .font(.system(size: 11.5)).foregroundStyle(.tertiary)
             }
         }
@@ -232,6 +232,70 @@ struct VoicePage: View {
             VocabularyCard()
             Card {
                 Toggle("Hold ⌃⌥ to dictate text", isOn: $engine.settings.dictationEnabled)
+            }
+        }
+    }
+}
+
+/// Every Claude model your Claude Code sign-in offers (newest of each family), or any exact model name.
+struct ModelPicker: View {
+    let title: String
+    @Binding var selection: String
+    @State private var names = ClaudeModels.resolved()
+    @State private var custom = ""
+
+    private var isCustom: Bool { !ClaudeModels.all.contains { $0.id == selection } }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Picker(title, selection: Binding(get: { isCustom ? "custom" : selection },
+                                             set: { selection = $0 == "custom" ? (custom.isEmpty ? selection : custom) : $0 })) {
+                ForEach(ClaudeModels.all) { option in
+                    Text("\(names[option.id].map(ClaudeModels.displayName) ?? option.family) — \(option.detail)").tag(option.id)
+                }
+                Divider()
+                Text("Exact model name…").tag("custom")
+            }
+            .frame(maxWidth: 380)
+            if isCustom {
+                TextField("claude-…", text: Binding(get: { selection }, set: { selection = $0.trimmingCharacters(in: .whitespaces) }))
+                    .textFieldStyle(.roundedBorder).frame(maxWidth: 200)
+            }
+        }
+        .task { names = await ClaudeModels.refresh() }
+    }
+}
+
+/// What Hark has learned by doing — each how-to was confirmed on screen before it was saved.
+struct LearnedCard: View {
+    @ObservedObject var book: LessonBook
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("What Hark has learned", systemImage: "graduationcap.fill").font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    if !book.lessons.isEmpty { Button("Forget all") { book.forgetAll() }.controlSize(.small) }
+                }
+                Text(book.lessons.isEmpty
+                     ? "When Claude works out how to do something (a button to click, a shortcut that works) and sees it worked, Hark remembers the how-to and goes straight to it next time."
+                     : "Saved only after the result was checked on screen. Used for similar requests in the same app or site; dropped after it fails twice.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                ForEach(book.lessons.sorted { $0.lastUsed > $1.lastUsed }) { lesson in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(lesson.task.prefix(1).uppercased() + lesson.task.dropFirst()).font(.system(size: 12.5, weight: .semibold))
+                            Text(lesson.how).font(.system(size: 11.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            Text([lesson.site.isEmpty ? lesson.app : lesson.site, "worked \(lesson.successes)×"].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.system(size: 10.5)).foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Button { book.forget(lesson.id) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless).help("Forget this")
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
     }

@@ -14,7 +14,7 @@ Hark is two Swift targets over one library:
 4. `HarkEngine.ingest` appends the text to the pending utterance and asks `CommandParser.streamingPlan` what can run now. Closed commands run immediately; the open-ended tail is held for the next segment. If the tail looks like something only the agent can handle, the engine starts warming the model right away.
 5. When ⌥⌘ is released, the rest of the audio is flushed and `CommandParser.plan` produces the final list: leading instant commands, then one `.agent(text)` for everything from the first unparseable clause on.
 6. Commands run serially in `drain()`. Steps stream to the floating island. Commands that synthesize keystrokes wait for `waitForKeysReleased()`.
-7. `.agent` runs `ClaudeBrain.run`: `claude -p` (the user's Claude Code sign-in) gets the request, context, and tool catalog, plus a screenshot with the area under the pointer boxed in red and a close-up of that area (its text and any selection go in a `[Pointing]` block), and replies with a JSON plan. Each step maps back onto the same executor and is logged; `"continue": true` sends results back for another round. The final answer is shown on the island as text.
+7. `.agent` runs `ClaudeBrain.run`: one long-lived Claude Code session (`claude -p --input-format stream-json`, the user's sign-in) gets the request, context, and a screenshot with the area under the pointer boxed in red plus a close-up (its text and any selection go in a `[Pointing]` block). Hark's actions are an MCP server (`Agent/MCPServer.swift`, streamable HTTP on 127.0.0.1 with a per-launch bearer token) next to the user's own MCP servers; Claude calls them in its own loop (`screenshot` to look again, `remember_how` / `forget_how` for learned how-tos) and its final message is shown on the island. Each tool call runs on the same executor as instant commands and is logged.
 
 ## Modules
 
@@ -58,7 +58,7 @@ Claude sessions resume (`--resume`) for ten minutes, so follow-ups keep context;
 2. Handle it in `HarkEngine.runTool` and give it a label in `toolLabel`.
 
 **Swap the brain**
-`ClaudeBrain` only needs a CLI that takes a system prompt and a message and returns text. Any model that can follow the JSON plan format works; swap `ClaudeBrain.execute`/`ask` for another backend.
+`ClaudeBrain` needs an agent runtime that can call MCP tools. Claude Code is it today; anything that speaks MCP can drive `MCPServer` the same way (`harkctl agent` runs it against simulated tools).
 
 **Swap the ears**
 `Transcriber` is a small actor around FluidAudio's `AsrManager`. Replace it with anything that maps `[Float]` (16 kHz mono) to `String`.

@@ -2,6 +2,8 @@ import Foundation
 
 public struct HarkSettings: Codable, Equatable, Sendable {
     public var claudeModel = "sonnet"
+    /// The fast model that turns speech into text edits.
+    public var writerModel = "haiku"
     /// Seconds the speech model stays in memory after its last use.
     public var speechIdleUnload: Int = Int.max / 2
     public var noiseSuppression = true
@@ -12,7 +14,7 @@ public struct HarkSettings: Codable, Equatable, Sendable {
     /// "parakeet" (NVIDIA, on the Neural Engine) or "apple" (Apple's on-device recognizer for `speechLocale`).
     public var speechEngine = "parakeet"
     public var speechLocale = "en-IN"
-    /// Opt-in: keep the last 20 commands' audio on this Mac so recognition can be tuned to your voice.
+    /// Opt-in troubleshooting: keep the last 20 commands' audio and transcripts on this Mac (nothing is trained on it).
     public var keepRecordings = false
     public var claudeProjectDirectory: String?
     public var preferredBrowser: String?
@@ -35,6 +37,7 @@ public struct HarkSettings: Codable, Equatable, Sendable {
         let defaults = HarkSettings()
         let c = try decoder.container(keyedBy: CodingKeys.self)
         claudeModel = try c.decodeIfPresent(String.self, forKey: .claudeModel) ?? defaults.claudeModel
+        writerModel = try c.decodeIfPresent(String.self, forKey: .writerModel) ?? defaults.writerModel
         speechIdleUnload = try c.decodeIfPresent(Int.self, forKey: .speechIdleUnload) ?? defaults.speechIdleUnload
         noiseSuppression = try c.decodeIfPresent(Bool.self, forKey: .noiseSuppression) ?? defaults.noiseSuppression
         vocabulary = try c.decodeIfPresent([String].self, forKey: .vocabulary) ?? defaults.vocabulary

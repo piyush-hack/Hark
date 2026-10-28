@@ -126,7 +126,7 @@ struct HomePage: View {
 
             HStack(spacing: 12) {
                 StatusTile(title: "Ears", value: "Parakeet v3", state: engine.speechModel.label, color: engine.speechModel.color, symbol: "ear.fill")
-                StatusTile(title: "Brain", value: "Claude \(engine.settings.claudeModel.capitalized)",
+                StatusTile(title: "Brain", value: "Claude \(ClaudeModels.resolved()[engine.settings.claudeModel].map(ClaudeModels.displayName) ?? engine.settings.claudeModel.capitalized)",
                            state: engine.brainAvailable ? "Ready · 0 MB" : "Install Claude Code",
                            color: engine.brainAvailable ? .green : .orange, symbol: "brain.head.profile")
                 StatusTile(title: "Automations", value: scheduler.automations.isEmpty ? "None yet" : "\(scheduler.automations.count) active",

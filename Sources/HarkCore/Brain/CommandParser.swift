@@ -508,15 +508,48 @@ public struct CommandParser {
     public static func plainText(_ request: String) -> String? {
         // Only an explicit "type …" is typed without asking the model. Speech that just follows ("next item",
         // "in the next line") could be an instruction in any wording, so the model decides that.
-        guard let m = request.trimmingCharacters(in: .whitespacesAndNewlines)
-            .firstMatch(#"^(?i:type in|type into|type out|type|dictate|write down|write in it|write into it|write in there|write here|write)[.:,]?\s+(.+)$"#) else { return nil }
-        var text = m[1]
-        text = text.replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|there|here|this)\s*[,:]?\s+"#, with: "", options: .regularExpression)
-        text = dictation(text)
+        guard let rest = typedPart(request) else { return nil }
+        let text = dictation(rest)
         guard !text.isEmpty, !text.contains("\n") else { return nil }
         let words = Set(text.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty })
         return words.isDisjoint(with: instructionWords) ? text : nil
     }
+
+    /// What comes after an explicit "type …" / "write …", or nil without one.
+    static func typedPart(_ request: String) -> String? {
+        guard let m = request.trimmingCharacters(in: .whitespacesAndNewlines)
+            .firstMatch(#"^(?i:type in|type into|type out|type|dictate|write down|write in it|write into it|write in there|write here|write)[.:,]?\s+(.+)$"#) else { return nil }
+        return m[1].replacingOccurrences(of: #"^(?i:in it|into it|in there|in here|there|here|this)\s*[,:]?\s+"#, with: "", options: .regularExpression)
+    }
+
+    /// What a phrase is while you're writing (or after "type …"). `words`: type it now — line breaks already applied,
+    /// the writing pass fixes the rest a moment later. `aboutText`: an instruction about what you've written ("put that
+    /// in brackets", "scratch that"), which the writing pass carries out. `edit`: formatting, selection, cursor or keys,
+    /// which need edit steps.
+    public enum WritingKind: Equatable, Sendable { case words(String), aboutText, edit }
+
+    public static func writingKind(_ phrase: String) -> WritingKind {
+        let typed = typedPart(phrase)
+        let text = dictation(typed ?? phrase)
+        let words = text.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        if !Set(words).isDisjoint(with: editWords) { return .edit }
+        if typed == nil, let first = words.first, instructionStarts.contains(first) { return .aboutText }
+        return text.isEmpty ? .aboutText : .words(text)
+    }
+
+    /// Words that need edit steps, not just text: formatting, selection, the cursor, the clipboard, keys.
+    static let editWords: Set<String> = [
+        "heading", "headings", "title", "subtitle", "subheading", "bold", "italic", "italics", "underline", "underlined",
+        "strikethrough", "bullet", "bullets", "bulleted", "numbered", "checklist", "checkbox", "select", "selection",
+        "highlight", "cursor", "caret", "copy", "paste", "undo", "redo", "font", "formatting", "indent", "press",
+        "translate", "summarize", "rewrite",
+    ]
+
+    /// How an instruction about the text starts ("put that in brackets", "scratch that", "change X to Y").
+    static let instructionStarts: Set<String> = [
+        "put", "make", "change", "replace", "delete", "remove", "erase", "scratch", "fix", "correct", "move", "add",
+        "insert", "capitalize", "wrap", "spell", "strike", "drop",
+    ]
 
     /// Words that can turn a sentence into an instruction about the text. Broad on purpose.
     static let instructionWords: Set<String> = [

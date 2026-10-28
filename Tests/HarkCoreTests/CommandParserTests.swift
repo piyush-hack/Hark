@@ -180,6 +180,44 @@ final class ContinuousTypingTests: XCTestCase {
         XCTAssertEqual(parser.streamingPlan("type heading as Introduction").ready, [])
         XCTAssertNil(CommandParser.plainText("type heading as Introduction"))
     }
+
+    func testWhileWritingWhatAPhraseIs() {
+        XCTAssertNil(CommandParser.plainText("see you at six"), "without writing mode, words alone aren't typed instantly")
+        XCTAssertEqual(CommandParser.writingKind("see you at six"), .words("see you at six"))
+        XCTAssertEqual(CommandParser.writingKind("this is great"), .words("this is great"), "only “type this …” drops “this”")
+        XCTAssertEqual(CommandParser.writingKind("type this is great"), .words("is great"))
+        XCTAssertEqual(CommandParser.writingKind("Also make sure your recharge is"), .words("Also make sure your recharge is"))
+        XCTAssertEqual(CommandParser.writingKind("Next line"), .words("\n"), "line breaks are typed instantly too")
+        XCTAssertEqual(CommandParser.writingKind("New paragraph"), .words("\n\n"))
+        XCTAssertEqual(CommandParser.writingKind("the next line of the poem"), .words("the next line of the poem"), "the pass decides mid-sentence")
+        XCTAssertEqual(CommandParser.writingKind("put that in brackets"), .aboutText)
+        XCTAssertEqual(CommandParser.writingKind("scratch that"), .aboutText)
+        XCTAssertEqual(CommandParser.writingKind("type put on your shoes"), .words("put on your shoes"), "after “type” it's text")
+        XCTAssertEqual(CommandParser.writingKind("make it bold"), .edit)
+        XCTAssertEqual(CommandParser.writingKind("type heading as Introduction"), .edit)
+        XCTAssertEqual(CommandParser.writingKind("type hello and press enter"), .edit)
+    }
+
+    func testSessionTextMustStillBeRightBeforeTheCaret() {
+        let caret = { (at: Int) in NSRange(location: at, length: 0) }
+        // Native fields: exact, at the caret.
+        XCTAssertEqual(TextEditor.sessionRange(" hello", in: "abc hello", selection: caret(9), web: false), NSRange(location: 3, length: 6))
+        XCTAssertNil(TextEditor.sessionRange(" hello", in: "abc hello", selection: caret(2), web: false), "you moved the cursor")
+        XCTAssertNil(TextEditor.sessionRange(" hello", in: "abc hellx", selection: caret(9), web: false), "you changed the text")
+        XCTAssertNil(TextEditor.sessionRange(" hello", in: "abc hello", selection: NSRange(location: 4, length: 5), web: false))
+        // Web editors (WhatsApp): the caret is reported short by up to one per line break.
+        let draft = "Hi Akash\nPlease recharge\nOtherwise all services will be terminated"
+        let end = (draft as NSString).length
+        XCTAssertNotNil(TextEditor.sessionRange(" will be terminated", in: draft, selection: caret(end - 2), web: true))
+        XCTAssertNotNil(TextEditor.sessionRange(" will be terminated", in: draft + "\n", selection: caret(end), web: true), "a line break the editor keeps at the end")
+        XCTAssertNil(TextEditor.sessionRange(" will be terminated", in: draft, selection: caret(end - 10), web: true), "caret well inside the text")
+        XCTAssertNil(TextEditor.sessionRange(" will be ended", in: draft, selection: caret(end), web: true), "the text doesn't end with it")
+    }
+
+    func testSameTextIgnoresNoBreakSpaces() {
+        XCTAssertTrue(TextEditor.sameText(" hello\u{00A0}world", " hello world"))
+        XCTAssertFalse(TextEditor.sameText("hello", "hello "))
+    }
 }
 
 final class WebsiteWatchTests: XCTestCase {
@@ -424,5 +462,40 @@ final class StuckTypingTests: XCTestCase {
             print("•", phrase, "→", clauses.map { "\($0.text): \($0.command.map { "\($0)" } ?? "nil")" })
             XCTAssertTrue(clauses.contains { $0.command != nil }, phrase)
         }
+    }
+}
+
+@MainActor
+final class LessonBookTests: XCTestCase {
+    func testFindsTheRightHowToAndForgetsFailures() {
+        let book = LessonBook(file: nil)
+        book.learn(task: "delete a note in Notes", how: "Click the note in the sidebar list, then cmd+backspace.", app: "Notes", site: "")
+        book.learn(task: "apply to a job with Easy Apply", how: "Click Easy Apply, then Next on each page.", app: "Google Chrome", site: "linkedin.com")
+        let found = book.relevant(to: "Delete this current note", app: "Notes", site: "")
+        XCTAssertEqual(found.first?.task, "delete a note in Notes")
+        XCTAssertTrue(book.relevant(to: "Delete this current note", app: "Google Chrome", site: "youtube.com").allSatisfy { $0.app != "Google Chrome" })
+        // Same task again replaces rather than duplicates.
+        book.learn(task: "delete notes in Notes", how: "Select it in the list, press cmd+backspace.", app: "Notes", site: "")
+        XCTAssertEqual(book.lessons.filter { $0.app == "Notes" }.count, 1)
+        let id = book.lessons.first { $0.app == "Notes" }!.id
+        book.failed(id); book.failed(id)
+        XCTAssertTrue(book.lessons.allSatisfy { $0.id != id }, "two failures and it's forgotten")
+    }
+
+    /// A how-to is only kept when Claude looked at the screen after its last action.
+    func testOnlySuccessSeenOnScreenIsLearned() async {
+        let engine = HarkEngine()
+        let early = await engine.agentTool("remember_how", ["task": "x", "how": "y", "app": "Notes"])
+        XCTAssertTrue(early.isError, "nothing done and nothing seen yet")
+        XCTAssertTrue(HarkEngine.mcpTools().contains { $0["name"] as? String == "screenshot" })
+    }
+}
+
+final class MCPServerTests: XCTestCase {
+    /// The session is reused only if this text never changes; a different key order once cost every request a cold start.
+    func testConfigIsStable() {
+        let server = MCPServer()
+        let first = server.configJSON
+        for _ in 0..<50 { XCTAssertEqual(server.configJSON, first) }
     }
 }

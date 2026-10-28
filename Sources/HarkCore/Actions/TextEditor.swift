@@ -160,11 +160,7 @@ public final class TextEditor {
         case "insert", "type", "write":
             let text = op["text"] as? String ?? ""
             guard !text.isEmpty else { return "" }
-            if let field = Self.capture(), replaceSelection(field, with: AX.spaced(text, before: Self.character(before: field))) {
-                return "Type “\(Self.short(text))”"
-            }
-            await keyboardGate()
-            try await Keyboard.type(text)
+            _ = try await insert(text)
             return "Type “\(Self.short(text))”"
 
         case "select", "highlight":
@@ -196,37 +192,34 @@ public final class TextEditor {
             guard setSelection(field.element, NSRange(location: position, length: 0)) else { throw EditError.needsScreen("This field won't let me move the cursor.") }
             return "Cursor \(op["after"] != nil ? "after" : op["before"] != nil ? "before" : "to") \(Self.short((op["after"] ?? op["before"] ?? op["to"] ?? "end") as? String ?? ""))"
 
-        case "delete", "remove", "erase" where op["text"] == nil && op["from"] == nil:
-            // The selection: the Delete key works in every field, readable or not.
-            await keyboardGate()
-            try Keyboard.press(KeyCombo(key: "delete"))
-            return "Delete"
-
-        case "cut", "copy" where op["text"] == nil && op["from"] == nil:
-            await keyboardGate()
-            try Keyboard.press(KeyCombo(key: name == "cut" ? "x" : "c", command: true))
-            return name == "cut" ? "Cut" : "Copy"
-
+        // (A `where` after several patterns only guards the last one, so the selection case is checked inside.)
         case "delete", "remove", "erase":
+            if op["text"] == nil && op["from"] == nil {
+                // The selection: the Delete key works in every field, readable or not.
+                await keyboardGate()
+                try Keyboard.press(KeyCombo(key: "delete"))
+                return "Delete"
+            }
             let field = try editable()
             let range = Self.tidy(try Self.target(op, in: field), in: field.text)
             let removed = (field.text as NSString).substring(with: range)
             guard range.length > 0 else { return "" }
-            guard setSelection(field.element, range), replaceSelection(field, with: "", spaced: false) else {
-                throw EditError.needsScreen("This field won't let me delete text.")
-            }
+            guard try await change(range, in: field, to: "") else { throw EditError.needsScreen("This field won't let me delete text.") }
             return "Delete “\(Self.short(removed))”"
 
         case "replace":
             let field = try editable()
             let range = try Self.target(op, in: field)
             let new = op["with"] as? String ?? ""
-            guard setSelection(field.element, range), let fresh = Self.read(field.element), replaceSelection(fresh, with: new, spaced: false) else {
-                throw EditError.needsScreen("This field won't let me change text.")
-            }
+            guard try await change(range, in: field, to: new) else { throw EditError.needsScreen("This field won't let me change text.") }
             return "Replace with “\(Self.short(new))”"
 
         case "cut", "copy":
+            if op["text"] == nil && op["from"] == nil {
+                await keyboardGate()
+                try Keyboard.press(KeyCombo(key: name == "cut" ? "x" : "c", command: true))
+                return name == "cut" ? "Cut" : "Copy"
+            }
             let field = try editable()
             let range = try Self.target(op, in: field)
             let picked = (field.text as NSString).substring(with: range)
@@ -235,16 +228,14 @@ public final class TextEditor {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(picked, forType: .string)
             if name == "cut" {
-                guard setSelection(field.element, removing), replaceSelection(field, with: "", spaced: false) else {
-                    throw EditError.needsScreen("This field won't let me cut text.")
-                }
+                guard try await change(removing, in: field, to: "") else { throw EditError.needsScreen("This field won't let me cut text.") }
             } else {
                 _ = setSelection(field.element, range)
             }
             return "\(name == "cut" ? "Cut" : "Copy") “\(Self.short(picked))”"
 
         case "paste":
-            guard let text = NSPasteboard.general.string(forType: .string) else { return "" }
+            guard let text = Keyboard.clipboardString() else { return "" }
             return try await apply(["op": "insert", "text": text], app: app, url: url).replacingOccurrences(of: "Type", with: "Paste")
 
         case "format", "style":
@@ -298,6 +289,126 @@ public final class TextEditor {
     private func editable() throws -> TextField {
         guard let field = Self.capture() else { throw EditError.needsScreen("I can't read this text field.") }
         return field
+    }
+
+    /// Types `text` at the caret (replacing any selection); returns exactly what went in, with any space added before it.
+    public func insert(_ text: String) async throws -> String {
+        let field = Self.capture()
+        let web = Self.isWebField()
+        let before = field.flatMap { web && Self.caretNearEnd($0) ? $0.text.last : Self.character(before: $0) }
+        let typed = field == nil ? text : AX.spaced(text, before: before)
+        if !web, let field, replaceSelection(field, with: typed) { return typed }
+        await keyboardGate()
+        guard web, let field else {
+            try await Keyboard.type(typed)
+            return typed
+        }
+        // Web editors: key events, checked — one that didn't land is typed once more.
+        for attempt in 0..<2 {
+            try Keyboard.typeLines(typed)
+            if await Self.waitFor(field.element, { $0.text != field.text }) != nil { break }
+            Log.info("Typing didn't show up in the field\(attempt == 0 ? "; typing it again" : "")")
+        }
+        return typed
+    }
+
+    /// Replaces the `count` characters before the caret with `text` by keys: ⇧← over them, then type over the
+    /// selection in one step (⌫ only when `text` is empty) — never delete first, so typing that doesn't land loses
+    /// nothing. For web editors, where an Accessibility selection lands late, at the wrong offset, and blocks pastes.
+    /// If the change doesn't show, call `collapseSelection` so nothing stays selected.
+    public func retypeBeforeCaret(_ count: Int, with text: String) async throws {
+        await keyboardGate()
+        for _ in 0..<count { try Keyboard.press(KeyCombo(key: "left", shift: true)) }
+        if !text.isEmpty {
+            try Keyboard.typeLines(text)
+        } else if count > 0 {
+            try Keyboard.press(KeyCombo(key: "delete"))
+        }
+    }
+
+    /// After a change that didn't take: the caret back at the end of the selection it left, the text untouched.
+    public func collapseSelection() async throws {
+        await keyboardGate()
+        try Keyboard.press(KeyCombo(key: "right"))
+    }
+
+    /// Chrome, Safari and Electron editors. Their Accessibility caret runs short (by about one per line break) and an
+    /// Accessibility selection blocks the next paste, so Hark changes their text with keys from the caret instead.
+    public static func isWebField() -> Bool {
+        guard let app = AX.frontmostApp() else { return false }
+        return Browser.all.contains(app.localizedName ?? "") || app.bundleURL.map(AX.isElectron) == true
+    }
+
+    /// In a web editor, whether the caret is at the end of the text, allowing for its short count.
+    static func caretNearEnd(_ field: TextField) -> Bool {
+        let length = (field.text as NSString).length
+        let breaks = field.text.filter { $0 == "\n" }.count
+        return field.selection.length == 0 && field.selection.location >= length - breaks - 1 && field.selection.location <= length
+    }
+
+    /// Where `written` sits: right before the caret. In a web editor the text must end with it (a line break the
+    /// editor keeps after the last line doesn't count) and the caret be at the end; nil when it isn't there — you
+    /// typed, deleted, or moved — so nothing of yours is ever changed.
+    nonisolated public static func sessionRange(_ written: String, in text: String, selection: NSRange, web: Bool) -> NSRange? {
+        guard !written.isEmpty, selection.length == 0 else { return nil }
+        let ns = text as NSString, length = (written as NSString).length
+        if !web {
+            guard selection.location >= length else { return nil }
+            let range = NSRange(location: selection.location - length, length: length)
+            return sameText(ns.substring(with: range), written) ? range : nil
+        }
+        let breaks = text.filter { $0 == "\n" }.count
+        guard selection.location >= ns.length - breaks - 1, selection.location <= ns.length else { return nil }
+        let trailing = { (s: String) in String(s.reversed().drop { $0 == "\n" }.reversed()) }
+        let core = trailing(text), mine = trailing(written)
+        guard !mine.isEmpty ? sameText(String(core.suffix(mine.count)), mine) : true else { return nil }
+        let start = (core as NSString).length - (mine as NSString).length
+        return NSRange(location: max(0, start), length: length)
+    }
+
+    /// Changes `range` to `text` ("" deletes it); true only if the field's text really changed. Accessibility first.
+    /// Web editors (WhatsApp, Slack…) often ignore Accessibility writes: then the range is selected — through
+    /// Accessibility, or with ⇧← when it ends at the caret — and pasted over.
+    func change(_ range: NSRange, in field: TextField, to text: String) async throws -> Bool {
+        let original = field.text
+        let end = NSRange(location: range.location + range.length, length: 0)
+        // Web views (Chrome, Electron) apply an Accessibility selection a moment later, not at once.
+        var fresh: TextField?
+        if setSelection(field.element, range) {
+            fresh = await Self.waitFor(field.element) { $0.selection == range }
+        }
+        if let fresh {
+            if replaceSelection(fresh, with: text, spaced: false) { return true }
+            Log.info("Change: selected through Accessibility; pasting over it")
+        } else {
+            // Selecting didn't take: only safe from the caret, backwards, over exactly this range.
+            let now = Self.read(field.element)
+            Log.info("Change: couldn't select \(range.location)+\(range.length) (selection now \(now.map { "\($0.selection.location)+\($0.selection.length)" } ?? "unknown"))")
+            guard let now, now.selection == end else { return false }
+            await keyboardGate()
+            for _ in 0..<(original as NSString).substring(with: range).count { try Keyboard.press(KeyCombo(key: "left", shift: true)) }
+        }
+        await keyboardGate()
+        if text.isEmpty { try Keyboard.press(KeyCombo(key: "delete")) } else { try await Keyboard.type(text) }
+        let changed = await Self.waitFor(field.element) { $0.text != original } != nil || Self.read(field.element) == nil
+        Log.info("Change: pasted over the range; text \(changed ? "changed" : "unchanged")")
+        // Never leave text selected after a failed change: the next words typed would replace it.
+        if !changed { _ = setSelection(field.element, field.selection) }
+        return changed
+    }
+
+    /// Reads the field until `done` holds (up to about a second): web views update what Accessibility sees a moment later.
+    static func waitFor(_ element: AXUIElement, _ done: (TextField) -> Bool) async -> TextField? {
+        for attempt in 0..<12 {
+            if let now = read(element), done(now) { return now }
+            if attempt < 11 { try? await Task.sleep(nanoseconds: 80_000_000) }
+        }
+        return nil
+    }
+
+    /// The same text as far as an editor is concerned (web editors store some spaces as no-break spaces).
+    nonisolated public static func sameText(_ a: String, _ b: String) -> Bool {
+        a.replacingOccurrences(of: "\u{00A0}", with: " ") == b.replacingOccurrences(of: "\u{00A0}", with: " ")
     }
 
     func setSelection(_ element: AXUIElement, _ range: NSRange) -> Bool {

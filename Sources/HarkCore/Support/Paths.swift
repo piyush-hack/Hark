@@ -3,6 +3,30 @@ import Foundation
 public enum Paths {
     public static let appName = "Hark"
 
+    /// Your terminal's PATH (from a login shell, read once), so tools Claude Code starts — MCP servers run with npx, uvx,
+    /// node, python from nvm or Homebrew — are found. Apps launched from the Dock only get a bare PATH.
+    public static let shellPATH: String = {
+        let fallback = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = ["-ilc", "printf '%s' \"$PATH\""]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return fallback }
+        let deadline = Date().addingTimeInterval(4)
+        while process.isRunning, Date() < deadline { usleep(20_000) }
+        if process.isRunning { process.terminate(); return fallback }
+        let path = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .components(separatedBy: "\n").last?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard path.contains("/usr/bin") else { return fallback }
+        // Keep Homebrew and the system folders even if the shell profile left them out.
+        let parts = path.split(separator: ":").map(String.init)
+        return (parts + fallback.split(separator: ":").map(String.init).filter { !parts.contains($0) }).joined(separator: ":")
+    }()
+
     public static let appSupport: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return ensure(base.appendingPathComponent(appName, isDirectory: true))

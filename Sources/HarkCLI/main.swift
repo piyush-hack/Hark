@@ -80,21 +80,24 @@ case "run":
     try await Task.sleep(nanoseconds: 2_500_000_000)
 
 case "agent":
-    // Runs requests through Claude (your Claude Code sign-in). --dry simulates the tools.
-    let dry = rest.contains("--dry")
-    let brain = await MainActor.run { ClaudeBrain() }
-    if let model = modelOverride { await MainActor.run { brain.model = model } }
-    if dry {
-        await MainActor.run {
-            brain.runTool = { call in
-                print("  → \(call.name)(\(call.arguments.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")))")
-                switch call.name {
-                case "read_screen": return "App: Google Chrome\nPage: Flights to Goa — https://www.google.com/travel/flights\nClickable/visible items:\n- [button] Search\n- [link] Cheapest ₹4,210 IndiGo 6:05 AM"
-                case "read_page": return "Cheapest flights to Goa: IndiGo ₹4,210 at 6:05 AM, Air India ₹5,020 at 9:40 AM."
-                default: return "OK"
-                }
-            }
+    // Runs requests through Claude Code with Hark's tool server answering from simulated tools (nothing on screen changes):
+    // checks the Claude ↔ Hark MCP plumbing. Real runs go through the app (hark://run).
+    let server = MCPServer()
+    server.tools = { await MainActor.run { HarkEngine.mcpTools() } }
+    server.call = { name, arguments in
+        print("  → \(name)(\(arguments.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")))")
+        switch name {
+        case "screenshot", "read_screen":
+            return ([["type": "text", "text": "App: Google Chrome\nPage: Flights to Goa — https://www.google.com/travel/flights\n- [button] Search\n- [link] Cheapest ₹4,210 IndiGo 6:05 AM"]], false)
+        case "read_page": return ([["type": "text", "text": "Cheapest flights to Goa: IndiGo ₹4,210 at 6:05 AM, Air India ₹5,020 at 9:40 AM."]], false)
+        default: return ([["type": "text", "text": "OK"]], false)
         }
+    }
+    try await server.start()
+    let brain = await MainActor.run { ClaudeBrain() }
+    await MainActor.run {
+        brain.harkServer = { server.configJSON }
+        if let model = modelOverride { brain.model = model }
     }
     for request in text.components(separatedBy: "||").map({ $0.trimmingCharacters(in: .whitespaces) }) where !request.isEmpty {
         let start = Date()

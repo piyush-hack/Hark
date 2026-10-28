@@ -457,6 +457,33 @@ public enum AX {
         return b.isEmpty ? 0 : Int(Double(overlap) / Double(b.count) * 60)
     }
 
+    /// Chooses a menu item in the front app's menu bar by its path — "Apple > About This Mac", "File > New Note",
+    /// "Format > Font > Bold" — through Accessibility: no pointing at pixels, works even when the menu is closed.
+    public static func pressMenu(_ path: [String]) -> String? {
+        guard let app = frontmostApp(), let barValue = value(appElement(app), kAXMenuBarAttribute) else { return nil }
+        var items = children(barValue as! AXUIElement) // swiftlint:disable:this force_cast
+        var chosen: [String] = []
+        for (index, wanted) in path.enumerated() {
+            let want = wanted.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: " .…"))
+            let titled = items.map { ($0, (string($0, kAXTitleAttribute) ?? "").lowercased().trimmingCharacters(in: CharacterSet(charactersIn: " .…"))) }
+            // The  menu has no visible title; its accessibility title is "Apple".
+            guard let match = titled.first(where: { $0.1 == want || (want == "apple" && $0.1 == "apple") })
+                    ?? titled.filter({ !$0.1.isEmpty }).max(by: { matchScore($0.1, want) < matchScore($1.1, want) }).flatMap({ matchScore($0.1, want) >= 65 ? $0 : nil })
+            else { return nil }
+            chosen.append(string(match.0, kAXTitleAttribute) ?? wanted)
+            if index == path.count - 1 {
+                return AXUIElementPerformAction(match.0, kAXPressAction as CFString) == .success ? chosen.joined(separator: " > ") : nil
+            }
+            // A menu bar item or submenu item holds an AXMenu whose children are the next level.
+            items = children(match.0).flatMap { string($0, kAXRoleAttribute) == "AXMenu" ? children($0) : [$0] }
+        }
+        return nil
+    }
+
+    static func children(_ element: AXUIElement) -> [AXUIElement] {
+        value(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
+    }
+
     /// The frame of an app's front window (global, top-left origin); the frontmost app when `appName` is nil.
     public static func frontWindowFrame(appName: String?) -> CGRect? {
         guard let app = runningApp(named: appName) else { return nil }

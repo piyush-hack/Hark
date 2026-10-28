@@ -69,6 +69,17 @@ public final class HarkEngine: ObservableObject {
     public let scheduler = Scheduler()
     public let browser = Browser()
     public let claudeBrain = ClaudeBrain()
+    /// Hark's actions as an MCP server for Claude Code.
+    private let mcp = MCPServer()
+    /// During a Claude run: when it last acted, and last looked at the screen (learning needs a look after acting).
+    private var agentActedAt = Date.distantPast
+    private var agentLookedAt = Date.distantPast
+    private var agentLessons: [Lesson] = []
+    /// Actions and failed steps in the current Claude run: a run that needed several, or recovered from one, is worth learning.
+    private var agentActions = 0
+    private var agentFailures = 0
+    /// How-tos learned from tasks Claude verified on screen; the next similar request starts from them.
+    public let lessonBook = LessonBook()
     private let textEditor = TextEditor()
     /// What the writing model just did, so "undo that" and "keep going" make sense.
     private var recentEdits: [String] = []
@@ -122,7 +133,12 @@ public final class HarkEngine: ObservableObject {
     public init() {
         let settings = HarkSettings.load()
         self.settings = settings
-        claudeBrain.runTool = { [weak self] call in await self?.runTool(call) ?? "Unavailable." }
+        claudeBrain.harkServer = { [weak self] in self?.mcp.configJSON ?? #"{"mcpServers":{}}"# }
+        claudeBrain.otherServers = { Connectors.usable().filter { $0 != "hark" } }
+        claudeBrain.onOtherTool = { [weak self] name in
+            Log.info("  ↳ Use " + Self.toolDisplayName(name))
+            self?.addStep("Use " + Self.toolDisplayName(name), status: .done)
+        }
         claudeBrain.observe = { [weak self] in
             guard let self else { return ("", []) }
             return (self.screenSummary(), await self.screenImages())
@@ -137,6 +153,8 @@ public final class HarkEngine: ObservableObject {
         loadActivity()
         let english = settings.englishSpeechModel
         Task { await Transcriber.shared.setVersion(english ? .v2 : .v3) }
+        let writer = settings.writerModel
+        Task { await EditorBrain.shared.setModel(writer) }
     }
 
     /// Call once at launch from the app (not from the CLI).
@@ -148,6 +166,103 @@ public final class HarkEngine: ObservableObject {
         }
         Task { await segmenter.prepare() }
         capture.prewarm()
+        startToolServer()
+    }
+
+    // MARK: Claude's tools
+
+    /// Opens Hark's MCP server and learns which MCP servers Claude Code has on this Mac.
+    private func startToolServer() {
+        mcp.tools = { await MainActor.run { Self.mcpTools() } }
+        mcp.call = { [weak self] name, arguments in
+            guard let self else { return ([["type": "text", "text": "Hark isn't running."]], true) }
+            return await self.agentTool(name, arguments)
+        }
+        Task {
+            do { try await mcp.start() } catch { Log.error("Hark's tools couldn't start: \(error.localizedDescription)") }
+            // Learn which MCP servers are connected (claude.ai ones take a few seconds), then open Claude's session with
+            // all of them allowed, so they're connected before the first request.
+            _ = await Connectors.discover()
+            await claudeBrain.prewarm()
+        }
+    }
+
+    /// Hark's tools in MCP form, plus the ones only Claude uses: screenshot, remember_how, forget_how.
+    public static func mcpTools() -> [[String: Any]] {
+        var tools = Tools.all.compactMap { tool -> [String: Any]? in
+            guard let fn = tool["function"] as? [String: Any], let name = fn["name"] as? String else { return nil }
+            return ["name": name, "description": fn["description"] as? String ?? "", "inputSchema": fn["parameters"] ?? ["type": "object"]]
+        }
+        func extra(_ name: String, _ description: String, _ properties: [String: [String: String]], _ required: [String]) -> [String: Any] {
+            ["name": name, "description": description, "inputSchema": ["type": "object", "properties": properties, "required": required]]
+        }
+        tools.append(extra("screenshot", "See the screen now: a screenshot (with the pointer's area boxed) and the front window's fields and buttons.", [:], []))
+        tools.append(extra("remember_how", "Save how a task is done on this Mac, after you checked on screen that it worked. General, no personal specifics.",
+                           ["task": ["type": "string", "description": "General task, e.g. delete a note in Notes"],
+                            "how": ["type": "string", "description": "What worked, and what didn't"],
+                            "app": ["type": "string", "description": "App it was done in"],
+                            "site": ["type": "string", "description": "Website domain, if any"]], ["task", "how", "app"]))
+        tools.append(extra("forget_how", "A [Learned] how-to didn't work: drop it.", ["id": ["type": "string", "description": "Its id, e.g. L3"]], ["id"]))
+        return tools
+    }
+
+    /// Runs one tool for Claude and returns MCP content.
+    func agentTool(_ name: String, _ arguments: [String: Any]) async -> (content: [[String: Any]], isError: Bool) {
+        let text = { (value: String) in [["type": "text", "text": value]] as [[String: Any]] }
+        switch name {
+        case "screenshot":
+            agentLookedAt = Date()
+            addStep("Look at the screen", status: .done)
+            Log.info("  ↳ Look at the screen")
+            var content: [[String: Any]] = []
+            for image in await screenImages() {
+                content.append(["type": "text", "text": image.label])
+                content.append(["type": "image", "data": image.jpeg.base64EncodedString(), "mimeType": "image/jpeg"])
+            }
+            content.append(["type": "text", "text": "[Screen]\n" + screenSummary()])
+            return (content, false)
+        case "remember_how":
+            // Only success Claude saw with its own eyes, after its last action, is worth keeping.
+            guard agentLookedAt > agentActedAt, agentActedAt > .distantPast else {
+                Log.info("Not learning “\(arguments["task"] as? String ?? "")”: nothing was checked after the last action")
+                return (text("Not saved: call screenshot after your last action and check it worked first."), true)
+            }
+            let app = arguments["app"] as? String ?? NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+            lessonBook.learn(task: arguments["task"] as? String ?? "", how: arguments["how"] as? String ?? "",
+                             app: AppCatalog.shared.resolve(app)?.name ?? app,
+                             site: (arguments["site"] as? String ?? "").replacingOccurrences(of: "www.", with: ""))
+            return (text("Saved."), false)
+        case "forget_how":
+            let id = arguments["id"] as? String ?? ""
+            lessonBook.failed(id)
+            agentLessons.removeAll { $0.id == id }
+            return (text("Noted."), false)
+        default:
+            // Looking (screen, page, or a read-only shell check like ls) confirms; anything else is an action.
+            let command = (arguments["command"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+            let readOnlyShell = name == "run_shell" && !Shell.needsConfirmation(command)
+                && command.matches(#"^(?:sleep \d+;\s*)?(?:ls|cat|head|tail|wc|find|mdfind|grep|stat|du|df|pgrep|ps|sw_vers|defaults read|which|file|echo|mdls)\b"#)
+            if ["read_screen", "read_page"].contains(name) || readOnlyShell { agentLookedAt = Date() }
+            else if !["list_tasks", "wait"].contains(name) { agentActedAt = Date(); agentActions += 1 }
+            let call = ToolCall(name: name, arguments: arguments.mapValues { value in
+                switch value {
+                case let string as String: return string
+                case let number as NSNumber: return number.stringValue
+                default: return String(describing: value)
+                }
+            })
+            let result = await runTool(call)
+            if result.hasPrefix("Error:") { agentFailures += 1 }
+            return (text(result), result.hasPrefix("Error:"))
+        }
+    }
+
+    /// "mcp__claude_ai_Google_Drive__search" → "Google Drive: search".
+    static func toolDisplayName(_ name: String) -> String {
+        let parts = name.components(separatedBy: "__")
+        guard parts.count >= 3 else { return name }
+        let server = parts[1].replacingOccurrences(of: "claude_ai_", with: "").replacingOccurrences(of: "_", with: " ")
+        return "\(server): \(parts[2...].joined(separator: " ").replacingOccurrences(of: "_", with: " "))"
     }
 
     public func shutdown() {
@@ -162,8 +277,8 @@ public final class HarkEngine: ObservableObject {
         isHoldingHotkey = true
         self.mode = mode
         pointAtRelease = nil
-        // The writing model starts while you talk, so it's ready by the time you finish the sentence.
-        if mode == .command { Task { await EditorBrain.shared.prewarm() } }
+        // The writing model and Claude's session start while you talk, so they're ready when you finish the sentence.
+        if mode == .command { Task { await EditorBrain.shared.prewarm(); await claudeBrain.prewarm() } }
         turnFromUser = true
         heardBySpeech = true
         transcript = ""
@@ -317,10 +432,12 @@ public final class HarkEngine: ObservableObject {
     private func transcribePhrase(_ segment: [Float]) async {
         if learningVoice { return await learnVoiceSample(segment) }
         // Hands-free hears the whole room: only your voice gets through (checked before transcribing, ~30 ms).
-        if settings.voiceMatch, handsFree || listeningForAnswer, !isHoldingHotkey,
-           let score = await VoiceID.shared.match(segment), score < VoiceID.threshold {
-            Log.info(String(format: "Ignored a voice that isn't yours (match %.2f)", score))
-            return
+        if settings.voiceMatch, handsFree || listeningForAnswer, !isHoldingHotkey, let score = await VoiceID.shared.match(segment) {
+            guard score >= VoiceID.threshold else {
+                Log.info(String(format: "Ignored a voice that isn't yours (match %.2f)", score))
+                return
+            }
+            Log.info(String(format: "Your voice (match %.2f)", score))
         }
         // Re-hear short leftovers ("Type in") together with what follows; longer phrases keep their own boundaries.
         let combined = mode == .command && !pendingAudio.isEmpty && pendingText.split(separator: " ").count <= 3
@@ -637,7 +754,7 @@ public final class HarkEngine: ObservableObject {
         // In a text field, whatever isn't an instant command is most likely about the text: the writing model takes
         // it (fast), and hands it on to Claude with the screen when it isn't.
         let mapped = real.map { command -> Command in
-            if case .agent(let text) = command, turnFromUser, TextEditor.isEditing() { return .edit(text) }
+            if case .agent(let text) = command, turnFromUser, directRequests.remove(text) == nil, TextEditor.isEditing() { return .edit(text) }
             return command
         }
         // "select from A to B and make it a heading" is one thought: one request, so the model sees the whole intent.
@@ -772,6 +889,9 @@ public final class HarkEngine: ObservableObject {
         queue.removeAll()
         runner?.cancel()
         runner = nil
+        pass?.cancel()
+        pass = nil
+        endSession()
         if let confirmation { confirmation.resume(returning: false) }
         confirmation = nil
         confirmationPrompt = nil
@@ -783,6 +903,11 @@ public final class HarkEngine: ObservableObject {
     /// Executes one command; returns words worth saying.
     private func execute(_ command: Command) async throws -> String? {
         try Task.checkCancellation()
+        // Anything other than writing (Return, "send it", another app): the last correction lands first.
+        switch command {
+        case .edit, .typeText: break
+        default: if !written.isEmpty { await settleWriting(); endSession() }
+        }
         switch command {
         case .openApp(let name):
             guard let app = AppCatalog.shared.resolve(name) else { throw HarkError("I couldn't find an app called \(name).") }
@@ -955,20 +1080,27 @@ public final class HarkEngine: ObservableObject {
     /// Anything it can't do as a text edit goes to Claude with the screen.
     private func runEditor(_ request: String) async throws -> String? {
         let started = Date()
+        // "type …", or anything while you're writing: words go in now, instructions about them go to the writing pass.
+        if writing || CommandParser.typedPart(request) != nil {
+            switch CommandParser.writingKind(request) {
+            case .words(let words):
+                try await write(words, heard: request)
+                return nil
+            case .aboutText where !written.isEmpty:
+                heard.append(request)
+                noteTyped()
+                addStep("“\(TextEditor.short(request))”", status: .done)
+                Log.info("For the writing pass: “\(request)”")
+                schedulePass()
+                return nil
+            default: break
+            }
+        }
+        await settleWriting()  // so the model reads the corrected text
         let field = TextEditor.capture()
         // "select X" outside any text field means picking it on screen.
         if field == nil, let m = request.firstMatch(#"^(?i:select|highlight)(?i: the)?\s+(.+?)[.!]?$"#) {
             return try await click(m[1])
-        }
-        // Plain words: straight in, no model, no wait.
-        if let words = CommandParser.plainText(request) {
-            addStep(try await textEditor.apply(["op": "insert", "text": words], app: "", url: nil), status: .done)
-            noteTyped()
-            recentEdits.append("“\(request)” → Type “\(TextEditor.short(words))”")
-            if recentEdits.count > 8 { recentEdits.removeFirst(recentEdits.count - 8) }
-            claudeBrain.note(request, did: "Type “\(words)”")
-            Log.info(String(format: "Typed instantly in %.0f ms: “%@”", Date().timeIntervalSince(started) * 1000, words))
-            return nil
         }
         let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
         let tab = Browser.all.contains(app) ? (try? browser.currentTab()) : nil
@@ -987,6 +1119,8 @@ public final class HarkEngine: ObservableObject {
         }
         let (ops, say) = EditorBrain.plan(from: answer)
         Log.info("Writing plan for “\(request)”: \(answer.replacingOccurrences(of: "\n", with: " ").prefix(300))")
+        // Edit steps change the text under the session: the next words start a new one.
+        if !ops.isEmpty { endSession() }
         if ops.contains(where: { ($0["op"] as? String)?.lowercased() == "agent" }) { return try await runAgent(request) }
         var did: [String] = []
         for op in ops {
@@ -1007,13 +1141,229 @@ public final class HarkEngine: ObservableObject {
         }
         if ops.contains(where: { ["insert", "type", "write", "paste"].contains(($0["op"] as? String ?? "").lowercased()) }) { noteTyped() }
         let summary = did.isEmpty ? (say.isEmpty ? "Nothing to change." : say) : did.joined(separator: " · ")
-        recentEdits.append("“\(request)” → \(summary)")
-        if recentEdits.count > 8 { recentEdits.removeFirst(recentEdits.count - 8) }
-        claudeBrain.note(request, did: summary)
+        noteEdit(request, did: summary)
         Log.info(String(format: "Edited in %.2fs: %@", Date().timeIntervalSince(started), summary))
         if !say.isEmpty { reply = say }
         return say.isEmpty ? nil : say
     }
+
+    /// Remembers an edit for the writing model ("undo that") and for Claude.
+    private func noteEdit(_ request: String, did: String) {
+        recentEdits.append("“\(request)” → \(did)")
+        if recentEdits.count > 8 { recentEdits.removeFirst(recentEdits.count - 8) }
+        claudeBrain.note(request, did: did)
+    }
+
+    // MARK: Writing session
+
+    /// While you write, Hark types what you say at once, and a background pass then turns your speech into the text you
+    /// meant — mishearings and spelled-out names fixed, "put that in brackets" or "scratch that" carried out — and
+    /// swaps in only what differs. `written` is exactly what Hark has typed this session, right before the caret;
+    /// `checked` is the part a pass has already made right; `heard` is your speech since then, raw. If you keep
+    /// talking while a pass runs, its answer is dropped and the next pass covers everything.
+    private var written = ""
+    /// The text field this session types into: never any other, even one that ends with the same words.
+    private var sessionElement: AXUIElement?
+    private var checked = ""
+    private var heard: [String] = []
+    private var sessionVersion = 0
+    private var pass: Task<Void, Never>?
+    private var lastWriteAt = Date.distantPast
+    /// Typing and corrections take turns: two pastes at once could swap their clipboard contents.
+    private var typingBusy = false
+    /// Requests a pass found among your words ("what time is it in Tokyo"): they go to Claude as they are.
+    private var directRequests: Set<String> = []
+
+    /// Types `words` now and has the next pass look at them.
+    private func write(_ words: String, heard phrase: String) async throws {
+        let started = Date()
+        await lockTyping()
+        defer { typingBusy = false }
+        // Picking up where this session left off? (Right after a paste a web editor may not show it yet.)
+        if !written.isEmpty, Date().timeIntervalSince(lastWriteAt) > 1, sessionField() == nil {
+            endSession("Starting a new writing session: the text around what I typed has changed (\(Self.beforeCaret(TextEditor.capture())))")
+        }
+        if written.isEmpty { sessionElement = TextEditor.capture()?.element }
+        let typed = try await textEditor.insert(words)
+        written += typed
+        heard.append(phrase)
+        lastWriteAt = Date()
+        noteTyped()
+        addStep("Type “\(TextEditor.short(words))”", status: .done)
+        noteEdit(phrase, did: "Type “\(TextEditor.short(words))”")
+        Log.info(String(format: "Typed instantly in %.0f ms: “%@”", Date().timeIntervalSince(started) * 1000, words))
+        schedulePass()
+    }
+
+    private func schedulePass() {
+        sessionVersion += 1
+        guard pass == nil else { return }  // the running pass sees the new speech and goes again
+        pass = Task { [weak self] in
+            while let self = self, !Task.isCancelled, !self.heard.isEmpty {
+                let version = self.sessionVersion
+                await self.runPass()
+                if self.sessionVersion == version { break }
+            }
+            self?.pass = nil
+        }
+    }
+
+    private func runPass() async {
+        let version = sessionVersion, consumed = heard.count
+        let started = Date()
+        guard let field = await sessionFieldSettled(), let range = sessionRange(in: field) else {
+            return endSession("Not correcting: the text around what I typed has changed (\(Self.beforeCaret(TextEditor.capture())))")
+        }
+        let ns = field.text as NSString
+        let from = max(0, range.location - 300)
+        let lead = String(written.prefix { $0.isWhitespace })
+        let fresh = String(written.dropFirst(checked.count))
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+        let lines = ["[App] \(app)", "[Before] \(ns.substring(with: NSRange(location: from, length: range.location - from)))",
+                     "[Written] \(checked.dropFirst(min(lead.count, checked.count)))",
+                     "[Just typed] \(checked.isEmpty ? String(fresh.dropFirst(lead.count)) : fresh)",
+                     "[Heard]\n" + heard.suffix(12).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")]
+        guard let answer = try? await EditorBrain.shared.ask(lines.joined(separator: "\n")), !Task.isCancelled else { return }
+        guard version == sessionVersion else { return Log.info("Writing pass: you said more meanwhile; going again with all of it") }
+        let (text, ask) = EditorBrain.session(from: answer)
+        let seconds = Date().timeIntervalSince(started)
+        if let text {
+            let intended = lead + text.drop { $0 == " " }
+            if intended != written {
+                await lockTyping()
+                let done = await applySession(intended)
+                typingBusy = false
+                guard done else { return endSession("Writing pass: should be “\(TextEditor.short(intended))”, but I couldn't change it safely; left it") }
+                Log.info(String(format: "Writing pass in %.2fs: “%@” → “%@”", seconds, TextEditor.short(String(written)), TextEditor.short(intended)))
+                written = intended
+                addStep("Fixed → “\(TextEditor.short(intended.trimmingCharacters(in: .whitespacesAndNewlines)))”", status: .done)
+                noteEdit(heard.joined(separator: " "), did: "Corrected to “\(intended)”")
+            } else {
+                Log.info(String(format: "Writing pass in %.2fs: right as typed", seconds))
+            }
+        }
+        checked = written
+        heard.removeFirst(min(consumed, heard.count))
+        if let ask {
+            Log.info("Writing pass: “\(ask)” is a request, not text")
+            directRequests.insert(ask)
+            enqueue([.agent(ask)], heard: ask)
+        }
+    }
+
+    /// Swaps in the text you meant, changing it only from the first difference on.
+    private func applySession(_ intended: String) async -> Bool {
+        guard let field = await sessionFieldSettled(), let range = sessionRange(in: field) else { return false }
+        let old = Array(written), new = Array(intended)
+        var keep = 0
+        while keep < old.count, keep < new.count, old[keep] == new[keep] { keep += 1 }
+        let oldTail = String(old[keep...]), newTail = String(new[keep...])
+        guard TextEditor.isWebField() else {
+            let offset = (String(old[..<keep]) as NSString).length
+            let part = NSRange(location: range.location + offset, length: (oldTail as NSString).length)
+            return (try? await textEditor.change(part, in: field, to: newTail)) == true
+        }
+        // Web editors: by keys from the caret, so only a short way back.
+        guard oldTail.count <= 80 else {
+            Log.info("Writing pass: the fix starts \(oldTail.count) characters back; too far to retype safely")
+            return false
+        }
+        guard (try? await textEditor.retypeBeforeCaret(oldTail.count, with: newTail)) != nil else { return false }
+        for attempt in 0..<12 {
+            if let now = TextEditor.capture(), TextEditor.sessionRange(intended, in: now.text, selection: now.selection, web: true) != nil { return true }
+            if attempt < 11 { try? await Task.sleep(nanoseconds: 80_000_000) }
+        }
+        try? await textEditor.collapseSelection()  // it didn't take: leave your text as it was, nothing selected
+        return false
+    }
+
+    /// Where this session's text sits in `field`, if it's still right before the caret.
+    private func sessionRange(in field: TextField) -> NSRange? {
+        guard let sessionElement, CFEqual(field.element, sessionElement) else { return nil }
+        return TextEditor.sessionRange(written, in: field.text, selection: field.selection, web: TextEditor.isWebField())
+    }
+
+    private func sessionField() -> TextField? {
+        guard let field = TextEditor.capture(), sessionRange(in: field) != nil else { return nil }
+        return field
+    }
+
+    /// The field once it shows this session's text before the caret: a web editor reports a paste a moment late.
+    private func sessionFieldSettled() async -> TextField? {
+        for attempt in 0..<8 {
+            if let field = sessionField() { return field }
+            if attempt < 7 { try? await Task.sleep(nanoseconds: 100_000_000) }
+        }
+        return nil
+    }
+
+    private func lockTyping() async {
+        while typingBusy { try? await Task.sleep(nanoseconds: 20_000_000) }
+        typingBusy = true
+    }
+
+    private func endSession(_ reason: String? = nil) {
+        if let reason, !written.isEmpty { Log.info(reason) }
+        written = ""
+        sessionElement = nil
+        checked = ""
+        heard = []
+        sessionVersion += 1  // a pass in flight drops its answer
+    }
+
+    /// Lets the writing pass finish (briefly) before anything reads the field or takes the text away — a model reading
+    /// it, Return, another app — so a correction never lands after the message is sent.
+    private func settleWriting() async {
+        for _ in 0..<35 where pass != nil { try? await Task.sleep(nanoseconds: 100_000_000) }
+    }
+
+    /// hark://edit: runs raw edit steps (TextEditor ops, plus "wait" with "ms" and "paste_text" with "text", which types
+    /// by pasting) and logs the field after each, to work out how an editor behaves.
+    public func debugEdit(_ json: String) async {
+        guard let ops = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else {
+            return Log.error("hark://edit: ops must be a JSON array of steps")
+        }
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+        // "only_in": every step first checks that the focused field has this label, and stops otherwise.
+        let only = ops.first { $0["op"] as? String == "only_in" }?["label"] as? String
+        for op in ops where op["op"] as? String != "only_in" {
+            let name = op["op"] as? String ?? ""
+            if let only, TextEditor.capture()?.label != only {
+                return Log.error("hark://edit: stopped before \(name): the focused field isn't “\(only)”")
+            }
+            var label = ""
+            do {
+                switch name {
+                case "retype":
+                    try await textEditor.retypeBeforeCaret(op["count"] as? Int ?? 0, with: op["text"] as? String ?? "")
+                    label = "retyped"
+                case "collapse": try await textEditor.collapseSelection(); label = "collapsed"
+                case "select_back":
+                    for _ in 0..<(op["count"] as? Int ?? 0) { try Keyboard.press(KeyCombo(key: "left", shift: true)) }
+                    label = "selected back"
+                case "wait": try await Task.sleep(nanoseconds: UInt64(op["ms"] as? Int ?? 300) * 1_000_000)
+                case "paste_text": try await Keyboard.type(op["text"] as? String ?? ""); label = "pasted"
+                case "key_text": Keyboard.typeKeys(op["text"] as? String ?? ""); label = "typed as keys"
+                case "shift_tap": Keyboard.tapShift(); label = "tapped shift"
+                default: label = try await textEditor.apply(op, app: app, url: nil)
+                }
+            } catch {
+                label = "failed: \(error.localizedDescription)"
+            }
+            let front = NSWorkspace.shared.frontmostApplication?.localizedName ?? "?"
+            Log.info("Edit step \(name) \(label) → [\(front)] \(Self.beforeCaret(TextEditor.capture()))")
+        }
+    }
+
+    /// For the log: where the caret is and the text just before it.
+    private static func beforeCaret(_ field: TextField?) -> String {
+        guard let field else { return "no readable field" }
+        let ns = field.text as NSString, caret = min(field.selection.location, ns.length)
+        let start = max(0, caret - 40)
+        let before = ns.substring(with: NSRange(location: start, length: caret - start)).replacingOccurrences(of: "\n", with: "↵")
+        return "caret \(caret)+\(field.selection.length) of \(ns.length), before it “\(before)”"
+    }
+
 
     /// Search where the writing model said: this site or app, the web, this page, or a named site.
     private func search(_ query: String, where place: String) async throws -> String {
@@ -1045,25 +1395,60 @@ public final class HarkEngine: ObservableObject {
     }
 
     private func runAgent(_ text: String) async throws -> String {
+        await settleWriting()
         // Keys still held: keep listening; the island shows the steps as they happen.
         if phase != .listening { phase = .thinking }
         brainModel = .loading
         claudeBrain.model = settings.claudeModel
         pointing = nil
-        if turnFromUser {
+        // The pointer's area only matters when the request is about it ("this", "here", "this section"…).
+        if turnFromUser, text.range(of: RegionPicker.pointingWords, options: [.regularExpression, .caseInsensitive]) != nil {
             let point = pointerForHere
             let (app, rect) = RegionPicker.region(at: point)
             pointing = (point, app, rect)
-            if text.range(of: RegionPicker.pointingWords, options: [.regularExpression, .caseInsensitive]) != nil { flash(rect, .looking) }
+            flash(rect, .looking)
         }
         defer { pointing = nil }
+        // What worked here before for something similar: Claude starts from it instead of exploring.
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+        let site = Browser.all.contains(app) ? ((try? browser.currentTab()).flatMap { URL(string: $0.url)?.host }?
+            .replacingOccurrences(of: "www.", with: "") ?? "") : ""
+        let learned = lessonBook.relevant(to: text, app: app, site: site)
+        let started = Date()
+        agentActedAt = .distantPast
+        agentLookedAt = .distantPast
+        agentLessons = learned
+        agentActions = 0
+        agentFailures = 0
+        let lessonsBefore = lessonBook.lessons.count
+        var context = currentContext()
+        if !learned.isEmpty {
+            context += "\n[Learned] How similar tasks were done here before (verified):\n"
+                + learned.map { "\($0.id) · \($0.task)\($0.site.isEmpty ? "" : " on \($0.site)") (\($0.app)): \($0.how)" }.joined(separator: "\n")
+            Log.info("Using what I learned: " + learned.map { "\($0.id) \($0.task)" }.joined(separator: "; "))
+        }
         let answer: String
         do {
-            answer = try await claudeBrain.run(text, context: currentContext())
+            answer = try await claudeBrain.run(text, context: context)
             brainModel = .ready
         } catch {
             brainModel = brainAvailable ? .ready : .unavailable("Claude Code not installed")
             throw error
+        }
+        // Lessons Claude was given and didn't drop: if it confirmed the result on screen, they worked again.
+        let checked = agentLookedAt > agentActedAt && agentActedAt > started
+        if checked { agentLessons.forEach { lessonBook.worked($0.id) } }
+        // Worth remembering only when something had to be figured out: a step failed and another way worked. Many easy
+        // steps aren't a lesson. The result must be checked on screen, and no lesson may already cover it. Hark asks
+        // (Claude doesn't reliably think to), after the answer is showing, and Claude may still say no.
+        if checked, agentFailures > 0, lessonBook.lessons.count == lessonsBefore, agentLessons.isEmpty {
+            reply = answer
+            Log.info("Asking Claude whether it learned something (\(agentFailures) step(s) failed before it worked)")
+            try? await claudeBrain.followUp("""
+            [Hark] A step failed before you got it working. Only if the way that worked is non-obvious and would save time next \
+            time (a hidden menu, a specific button or shortcut, an order that matters), and you saw it work on screen, call \
+            remember_how with it in one or two short sentences, including what didn't work. Otherwise reply only "no".
+            """)
         }
         reply = answer
         return answer
@@ -1123,7 +1508,12 @@ public final class HarkEngine: ObservableObject {
         let dot = pointing.flatMap { bounds.contains($0.point) ? CGPoint(x: ($0.point.x - bounds.minX) * pixels, y: ($0.point.y - bounds.minY) * pixels) : nil }
         var images: [ScreenImage] = []
         if let full = Self.jpeg(image, maxWidth: 1400, box: area, dot: dot) {
-            images.append(ScreenImage(label: area == nil ? "The screen:" : "The screen (red box: the area around the user's mouse pointer; red dot: the pointer):", jpeg: full))
+            let scale = min(1, 1400 / CGFloat(image.width))
+            let size = CGSize(width: Int(CGFloat(image.width) * scale), height: Int(CGFloat(image.height) * scale))
+            lastShot = (bounds, size)
+            let grid = "\(Int(size.width))×\(Int(size.height)) px — click_at uses these pixel coordinates"
+            images.append(ScreenImage(label: area == nil ? "The screen (\(grid)):"
+                                      : "The screen (\(grid); red box: the area around the user's mouse pointer; red dot: the pointer):", jpeg: full))
         }
         if let area, let crop = image.cropping(to: area), let closeUp = Self.jpeg(crop, maxWidth: 1100, box: nil, dot: nil) {
             images.append(ScreenImage(label: "Close-up of the area the user is pointing at:", jpeg: closeUp))
@@ -1203,6 +1593,14 @@ public final class HarkEngine: ObservableObject {
                 return await readScreen()
             case "click":
                 return try await click(call.string("target"))
+            case "click_at":
+                return try await clickAt(call)
+            case "menu":
+                let path = call.string("path").components(separatedBy: ">").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                guard let chosen = AX.pressMenu(path) else {
+                    return "Error: no menu item “\(path.joined(separator: " > "))” in \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "the front app")."
+                }
+                return "Chose \(chosen)."
             case "open_search_result":
                 _ = try await execute(.openResult(call.int("number") ?? 1))
                 if let tab = try? browser.currentTab() { return "Opened \(tab.title) — \(tab.url)" }
@@ -1294,6 +1692,8 @@ public final class HarkEngine: ObservableObject {
         case "read_screen": return "Look at the screen"
         case "read_page": return "Read the page"
         case "click": return "Click “\(call.string("target"))”"
+        case "click_at": return "Click at \(call.string("x")), \(call.string("y"))"
+        case "menu": return "Menu \(call.string("path"))"
         case "open_search_result": return "Open result \(call.string("number"))"
         case "type_text": return "Type “\(call.string("text").prefix(30))”"
         case "press_keys": return "Press \(call.string("keys"))"
@@ -1316,15 +1716,40 @@ public final class HarkEngine: ObservableObject {
     }
 
     private func click(_ target: String) async throws -> String {
+        // An empty label matches everything: never click "something".
+        guard !target.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters)).isEmpty else {
+            throw HarkError("click needs the button's label or text; for an unlabeled icon, take a screenshot and use click_at.")
+        }
         if target.matches(#"\b(send|delete|remove|buy|purchase|pay|place order|checkout|transfer|unsubscribe|publish|post|submit|confirm|erase)\b"#) {
             guard await confirm("Click “\(target)”?") else { return "Cancelled." }
         }
         // Pressing through Accessibility needs no mouse, so it can happen while ⌥⌘ is still held.
         if AX.click(label: target, allowMouse: false) { return "Clicked \(target)." }
         await waitForKeysReleased()
-        if AX.click(label: target) { return "Clicked \(target)." }
-        if ScreenText.hasPermission, try await ScreenText.click(text: target) { return "Clicked \(target)." }
-        throw HarkError("I couldn't find “\(target)” on screen.")
+        // A pane or page that just opened may still be drawing: give it a moment before deciding it isn't there.
+        for attempt in 0..<4 {
+            if attempt > 0 { try await Task.sleep(nanoseconds: 450_000_000) }
+            if AX.click(label: target) { return "Clicked \(target)." }
+            if ScreenText.hasPermission, try await ScreenText.click(text: target) { return "Clicked \(target)." }
+        }
+        // Say what is there, so the next try can aim right (by another label, or click_at on the screenshot).
+        let visible = AX.snapshot(browser: browser).describe(maxElements: 30)
+        throw HarkError("I couldn't find “\(target)” on screen. What's clickable now:\n\(visible)\nLook with screenshot and use click_at if it has no label.")
+    }
+
+    /// The latest screenshot's geometry, so click_at can turn its pixels back into screen points.
+    private var lastShot: (bounds: CGRect, size: CGSize)?
+
+    private func clickAt(_ call: ToolCall) async throws -> String {
+        guard let shot = lastShot, let x = Double(call.string("x")), let y = Double(call.string("y")) else {
+            return "Call screenshot first, then click_at with its pixel coordinates."
+        }
+        let point = CGPoint(x: shot.bounds.minX + x * shot.bounds.width / shot.size.width,
+                            y: shot.bounds.minY + y * shot.bounds.height / shot.size.height)
+        guard shot.bounds.contains(point) else { return "That point is outside the screenshot." }
+        await waitForKeysReleased()
+        Keyboard.click(at: point, right: call.string("button") == "right", count: call.bool("double") ? 2 : 1)
+        return "Clicked at \(Int(x)), \(Int(y))."
     }
 
     /// True when "search for X" should be a Google search: from a blank/new tab or Google itself, or with no app in front.
@@ -1377,7 +1802,7 @@ public final class HarkEngine: ObservableObject {
         await waitForKeysReleased()
         let pasteboard = NSPasteboard.general
         let before = pasteboard.changeCount
-        let saved = pasteboard.string(forType: .string)
+        let saved = Keyboard.clipboardString()
         try? Keyboard.press(KeyCombo(key: "c", command: true))
         try? await Task.sleep(nanoseconds: 200_000_000)
         guard pasteboard.changeCount != before else { return nil }
@@ -1664,6 +2089,7 @@ public final class HarkEngine: ObservableObject {
         Task { await Transcriber.shared.setVersion(english ? .v2 : .v3) }
         capture.voiceProcessing = settings.noiseSuppression
         if settings.voiceMatch, !old.voiceMatch { Task { await prepareVoiceMatch() } }
+        if settings.writerModel != old.writerModel { let model = settings.writerModel; Task { await EditorBrain.shared.setModel(model) } }
     }
 
     // MARK: Attention

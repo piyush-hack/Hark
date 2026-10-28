@@ -108,7 +108,7 @@ public enum Shell {
 
     /// Commands that change or destroy things need a spoken "yes" first.
     public static func needsConfirmation(_ command: String) -> Bool {
-        command.matches(#"(^|[;&|\s])(rm|rmdir|mv|sudo|chmod|chown|kill|killall|pkill|shutdown|reboot|halt|dd|mkfs|diskutil|launchctl|defaults\s+(write|delete)|git\s+(push|reset|clean|checkout\s+--|rebase)|npm\s+publish|curl[^|]*\|\s*(ba|z)?sh|osascript|truncate|>\s*/)\b"#)
+        command.matches(#"(^|[;&|\s])(rm|rmdir|mv|sudo|chmod|chown|kill|killall|pkill|shutdown|reboot|halt|dd|mkfs|diskutil|launchctl|defaults\s+(write|delete)|git\s+(push|reset|clean|checkout\s+--|rebase)|npm\s+publish|curl[^|]*\|\s*(ba|z)?sh|osascript|pbcopy|truncate|>\s*/)\b"#)
     }
 }
 
