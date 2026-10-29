@@ -150,7 +150,7 @@ public final class HarkEngine: ObservableObject {
         }
         claudeBrain.observe = { [weak self] in
             guard let self else { return ("", []) }
-            return (self.screenSummary(), await self.screenImages())
+            return (await self.screenSummary(), await self.screenImages())
         }
         browser.preferred = { [weak self] in self?.settings.preferredBrowser }
         browser.keyboardGate = { [weak self] in await self?.waitForKeysReleased() }
@@ -229,7 +229,7 @@ public final class HarkEngine: ObservableObject {
                 content.append(["type": "text", "text": image.label])
                 content.append(["type": "image", "data": image.jpeg.base64EncodedString(), "mimeType": "image/jpeg"])
             }
-            content.append(["type": "text", "text": "[Screen]\n" + screenSummary()])
+            content.append(["type": "text", "text": "[Screen]\n" + (await screenSummary())])
             return (content, false)
         case "remember_how":
             let task = (arguments["task"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -638,7 +638,7 @@ public final class HarkEngine: ObservableObject {
         pendingText = Self.joinPhrases(pendingText, text)
         var (ready, remainder) = parser.streamingPlan(pendingText)
         // An in-app search can't be refined as you keep talking, so it waits until the phrase is finished.
-        if remainder.isEmpty, let last = ready.last, case .searchHere = last, !searchGoesToGoogle() {
+        if remainder.isEmpty, let last = ready.last, case .searchHere = last, !searchGoesToGoogle(url: browser.lastTab?.url) {
             ready.removeLast()
             remainder = parser.parse(pendingText).last?.text ?? ""
         }
@@ -917,11 +917,11 @@ public final class HarkEngine: ObservableObject {
         while !queue.isEmpty {
             let (command, heard) = queue.removeFirst()
             if phase != .listening { phase = command.isAgent ? .thinking : .working }
-            let index = steps.firstIndex { $0.title == command.title && $0.status == .pending }
-            if let index { steps[index].status = .running }
+            let step = steps.first { $0.title == command.title && $0.status == .pending }?.id
+            mark(step, .running)
             if dryRun {
                 dryRunLog.append((Double(consumedSamples) / 16_000, command.title))
-                if let index { steps[index].status = .done }
+                mark(step, .done)
                 continue
             }
             running = command
@@ -935,13 +935,13 @@ public final class HarkEngine: ObservableObject {
                 Log.info("Run: \(command.title)")
                 let result = try await execute(command)
                 Log.info("Done: \(command.title)\(result.map { " → \($0)" } ?? "")")
-                if let index { steps[index].status = .done }
+                mark(step, .done)
                 if let result, !result.isEmpty { turnResults.append(result) }
                 if !command.isAgent { claudeBrain.note(heard, did: command.title) }
             } catch is CancellationError {
                 break
             } catch {
-                if let index { steps[index].status = .failed }
+                mark(step, .failed)
                 Log.error("Failed: \(command.title) — \(error.localizedDescription)")
                 turnOK = false
                 turnResults.append(error.localizedDescription)
@@ -954,6 +954,11 @@ public final class HarkEngine: ObservableObject {
         } else if handsFree, somethingToShow {
             tick()
         }
+    }
+
+    /// Steps are cleared or trimmed while a command runs (the next phrase, a new turn), so they're found by id, never by index.
+    private func mark(_ step: UUID?, _ status: Step.Status) {
+        if let step, let i = steps.firstIndex(where: { $0.id == step }) { steps[i].status = status }
     }
 
     private var somethingToShow: Bool {
@@ -1142,7 +1147,7 @@ public final class HarkEngine: ObservableObject {
         case .claude(let prompt):
             return try await ClaudeBridge.send(prompt) { await self.waitForKeysReleased() }
         case .downloadCurrent:
-            if let tab = try? browser.currentTab(), let url = URL(string: tab.url), Downloader.isDirectFile(url) {
+            if let tab = try? await browser.currentTab(), let url = URL(string: tab.url), Downloader.isDirectFile(url) {
                 let file = try await Downloader.download(url)
                 return "Saved \(file.lastPathComponent) to Downloads"
             }
@@ -1160,7 +1165,7 @@ public final class HarkEngine: ObservableObject {
             reply = text
             return text
         case .watch(let spec):
-            let watch = makeWatch(spec)
+            let watch = await makeWatch(spec)
             scheduler.add(Automation(trigger: .screenWatch(watch), task: spec.action, reminder: false, createdBy: "you"))
             if let rect = watch.rect { flash(rect, .confirm) }
             let text = "Watching. When \(watch.label), I'll \(spec.action.lowercased())."
@@ -1259,7 +1264,7 @@ public final class HarkEngine: ObservableObject {
             return try await click(m[1])
         }
         let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-        let tab = Browser.all.contains(app) ? (try? browser.currentTab()) : nil
+        let tab = Browser.all.contains(app) ? (try? await browser.currentTab()) : nil
         var lines = ["[App] \(app)" + (tab.map { " — \($0.title) — \($0.url)" } ?? "")]
         lines.append(field?.describe() ?? "[Field] none readable\n[Text] unavailable (insert, format and key still work)")
         if !recentEdits.isEmpty { lines.append("[Recent] " + recentEdits.suffix(4).joined(separator: " · ")) }
@@ -1636,7 +1641,7 @@ public final class HarkEngine: ObservableObject {
         defer { pointing = nil }
         // What worked here before for something similar: Claude starts from it instead of exploring.
         let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-        let site = Browser.all.contains(app) ? ((try? browser.currentTab()).flatMap { URL(string: $0.url)?.host }?
+        let site = Browser.all.contains(app) ? ((try? await browser.currentTab()).flatMap { URL(string: $0.url)?.host }?
             .replacingOccurrences(of: "www.", with: "") ?? "") : ""
         let learned = lessonBook.relevant(to: text, app: app, site: site)
         let started = Date()
@@ -1645,7 +1650,7 @@ public final class HarkEngine: ObservableObject {
         agentLessons = learned
         effort = RunEffort()
         let lessonsBefore = lessonBook.lessons.count
-        var context = currentContext()
+        var context = await currentContext()
         if !learned.isEmpty {
             context += "\n[Learned] How similar tasks were done here before (verified):\n"
                 + learned.map { "\($0.id) · \($0.task)\($0.site.isEmpty ? "" : " on \($0.site)") (\($0.app)): \($0.how)" }.joined(separator: "\n")
@@ -1683,19 +1688,19 @@ public final class HarkEngine: ObservableObject {
         return answer
     }
 
-    private func currentContext() -> String {
+    private func currentContext() async -> String {
         var lines: [String] = []
         let f = DateFormatter()
         f.dateFormat = "EEEE d MMMM yyyy, h:mm a"
         lines.append("Now: \(f.string(from: Date()))")
         if let app = NSWorkspace.shared.frontmostApplication?.localizedName { lines.append("Front app: \(app)") }
-        if let tab = try? browser.currentTab(), Browser.all.contains(NSWorkspace.shared.frontmostApplication?.localizedName ?? "") {
+        if Browser.all.contains(NSWorkspace.shared.frontmostApplication?.localizedName ?? ""), let tab = try? await browser.currentTab() {
             lines.append("Browser page: \(tab.title) — \(tab.url)")
         }
         if !turnResults.isEmpty { lines.append("Already done this turn: " + turnResults.joined(separator: "; ")) }
         if !settings.vocabulary.isEmpty { lines.append("Names/addresses the user uses: " + settings.vocabulary.joined(separator: ", ")) }
         if let pointed = pointingContext() { lines.append(pointed) }
-        lines.append("[Screen]\n" + screenSummary())
+        lines.append("[Screen]\n" + (await screenSummary()))
         return lines.joined(separator: "\n")
     }
 
@@ -1775,8 +1780,8 @@ public final class HarkEngine: ObservableObject {
     private var askedForScreen = false
 
     /// What's on screen right now, compactly: focused field, selection, visible buttons/fields/links.
-    func screenSummary() -> String {
-        AX.snapshot(browser: browser).describe(maxElements: 45)
+    func screenSummary() async -> String {
+        await AX.snapshot(browser: browser).describe(maxElements: 45)
     }
 
     // MARK: Agent tools
@@ -1816,7 +1821,7 @@ public final class HarkEngine: ObservableObject {
             case "read_screen":
                 return await readScreen()
             case "read_page":
-                if let text = browser.pageText(), !text.isEmpty { return text }
+                if let text = await browser.pageText(), !text.isEmpty { return text }
                 let text = AX.readableText()
                 if text.count > 200 { return text }
                 return await readScreen()
@@ -1832,7 +1837,7 @@ public final class HarkEngine: ObservableObject {
                 return "Chose \(chosen)."
             case "open_search_result":
                 _ = try await execute(.openResult(call.int("number") ?? 1))
-                if let tab = try? browser.currentTab() { return "Opened \(tab.title) — \(tab.url)" }
+                if let tab = try? await browser.currentTab() { return "Opened \(tab.title) — \(tab.url)" }
                 return "Opened result."
             case "type_text":
                 _ = try await execute(.typeText(call.string("text")))
@@ -1886,7 +1891,7 @@ public final class HarkEngine: ObservableObject {
                 // A click is stored as a plain "click X", which fires instantly with no model involved.
                 let action = call.string("click").isEmpty ? call.string("instruction") : "click \(call.string("click"))"
                 guard !action.isEmpty else { return "Say what to do when it fires: click or instruction." }
-                let watch = makeWatch(WatchSpec(scope: scope, text: text, action: action))
+                let watch = await makeWatch(WatchSpec(scope: scope, text: text, action: action))
                 let automation = scheduler.add(Automation(trigger: .screenWatch(watch), task: action, reminder: false, createdBy: "Hark"))
                 if let rect = watch.rect { flash(rect, .confirm) }
                 return "Watching: \(automation.summary)."
@@ -1936,7 +1941,7 @@ public final class HarkEngine: ObservableObject {
     }
 
     private func readScreen() async -> String {
-        var snapshot = AX.snapshot(browser: browser)
+        var snapshot = await AX.snapshot(browser: browser)
         if snapshot.elements.count < 8, ScreenText.hasPermission,
            let lines = try? await ScreenText.recognize(fast: true) {
             snapshot.ocrText = lines.map(\.text).joined(separator: "\n")
@@ -1962,7 +1967,7 @@ public final class HarkEngine: ObservableObject {
             if ScreenText.hasPermission, try await ScreenText.click(text: target) { return "Clicked \(target)." }
         }
         // Say what is there, so the next try can aim right (by another label, or click_at on the screenshot).
-        let visible = AX.snapshot(browser: browser).describe(maxElements: 30)
+        let visible = await AX.snapshot(browser: browser).describe(maxElements: 30)
         throw HarkError("I couldn't find “\(target)” on screen. What's clickable now:\n\(visible)\nLook with screenshot and use click_at if it has no label.")
     }
 
@@ -1982,24 +1987,25 @@ public final class HarkEngine: ObservableObject {
     }
 
     /// True when "search for X" should be a Google search: from a blank/new tab or Google itself, or with no app in front.
-    private func searchGoesToGoogle() -> Bool {
+    private func searchGoesToGoogle(url: String?) -> Bool {
         let front = NSWorkspace.shared.frontmostApplication
         let name = front?.localizedName ?? ""
         if front?.processIdentifier == ProcessInfo.processInfo.processIdentifier || name.isEmpty { return true }
         guard Browser.all.contains(name) else { return false }
-        let url = (try? browser.currentTab())?.url ?? ""
+        let url = url ?? ""
         return url.isEmpty || url.contains("newtab") || url.hasPrefix("about:") || url.contains("://www.google.") || url.contains("://google.")
     }
 
     /// Search where the user is: the page's or app's own search box; Google from a new tab or as a last resort.
     private func searchHere(_ query: String) async throws {
         let name = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-        if searchGoesToGoogle() {
+        let url = Browser.all.contains(name) ? (try? await browser.currentTab())?.url : nil
+        if searchGoesToGoogle(url: url) {
             try await browser.open(SearchSite.google.url(for: query))
             return
         }
         // On a website: that site's own results page, in the same tab (YouTube results on YouTube).
-        if Browser.all.contains(name), let host = (try? browser.currentTab()).flatMap({ URL(string: $0.url)?.host }),
+        if Browser.all.contains(name), let host = url.flatMap({ URL(string: $0)?.host }),
            let url = await SiteSearch.shared.url(host: host, query: query) {
             try await browser.open(url, replaceCurrent: true)
             Log.info("Searched \(host) for “\(query)”")
@@ -2127,10 +2133,10 @@ public final class HarkEngine: ObservableObject {
 
     // MARK: Screen watchers
 
-    private func makeWatch(_ spec: WatchSpec) -> ScreenWatch {
+    private func makeWatch(_ spec: WatchSpec) async -> ScreenWatch {
         var spec = spec
         if spec.text == WatchSpec.currentSite {
-            let host = (try? browser.currentTab()).flatMap { URL(string: $0.url)?.host }?.replacingOccurrences(of: "www.", with: "")
+            let host = (try? await browser.currentTab()).flatMap { URL(string: $0.url)?.host }?.replacingOccurrences(of: "www.", with: "")
             spec.text = host ?? "http"
         }
         switch spec.scope {

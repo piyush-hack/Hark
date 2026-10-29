@@ -132,12 +132,12 @@ public enum AX {
     }
 
     @MainActor
-    public static func snapshot(browser: Browser? = nil) -> ScreenSnapshot {
+    public static func snapshot(browser: Browser? = nil) async -> ScreenSnapshot {
         var snap = ScreenSnapshot()
         guard let app = frontmostApp() else { return snap }
         snap.appName = app.localizedName ?? ""
         if Browser.chromium.contains(snap.appName) || app.bundleURL.map(isElectron) == true { enableWebAccessibility(app) }
-        if let browser, Browser.all.contains(snap.appName), let tab = try? browser.currentTab() {
+        if let browser, Browser.all.contains(snap.appName), let tab = try? await browser.currentTab() {
             snap.browserURL = tab.url
             snap.browserTitle = tab.title
         }

@@ -6,19 +6,19 @@ public enum SystemControl {
         switch action {
         case .volumeUp: Keyboard.mediaKey(Keyboard.soundUp); return "Volume up"
         case .volumeDown: Keyboard.mediaKey(Keyboard.soundDown); return "Volume down"
-        case .mute: try AppleScript.run("set volume with output muted"); return "Muted"
-        case .unmute: try AppleScript.run("set volume without output muted"); return "Unmuted"
+        case .mute: try await AppleScript.run("set volume with output muted"); return "Muted"
+        case .unmute: try await AppleScript.run("set volume without output muted"); return "Unmuted"
         case .setVolume:
             let level = max(0, min(100, value ?? 50))
-            try AppleScript.run("set volume output volume \(level)\nset volume without output muted")
+            try await AppleScript.run("set volume output volume \(level)\nset volume without output muted")
             return "Volume \(level)%"
         case .play, .pause, .playPause:
-            return try mediaPlayback(action)
+            return try await mediaPlayback(action)
         case .nextTrack:
-            if let player = activePlayer() { try AppleScript.run("tell application \"\(player)\" to next track") } else { Keyboard.mediaKey(Keyboard.mediaNext) }
+            if let player = await activePlayer() { try await AppleScript.run("tell application \"\(player)\" to next track") } else { Keyboard.mediaKey(Keyboard.mediaNext) }
             return "Next track"
         case .previousTrack:
-            if let player = activePlayer() { try AppleScript.run("tell application \"\(player)\" to previous track") } else { Keyboard.mediaKey(Keyboard.mediaPrevious) }
+            if let player = await activePlayer() { try await AppleScript.run("tell application \"\(player)\" to previous track") } else { Keyboard.mediaKey(Keyboard.mediaPrevious) }
             return "Previous track"
         case .lockScreen:
             await keyboardGate()
@@ -29,7 +29,7 @@ public enum SystemControl {
             return "Display asleep"
         case .darkModeOn, .darkModeOff, .toggleDarkMode:
             let value = action == .darkModeOn ? "true" : (action == .darkModeOff ? "false" : "not dark mode")
-            try AppleScript.run("tell application \"System Events\" to tell appearance preferences to set dark mode to \(value)")
+            try await AppleScript.run("tell application \"System Events\" to tell appearance preferences to set dark mode to \(value)")
             return action == .darkModeOff ? "Light mode" : "Dark mode"
         case .screenshot:
             await keyboardGate()
@@ -46,20 +46,20 @@ public enum SystemControl {
         }
     }
 
-    private static func activePlayer() -> String? {
+    private static func activePlayer() async -> String? {
         for name in ["Spotify", "Music"] where NSWorkspace.shared.runningApplications.contains(where: { $0.localizedName == name }) {
-            if let state = try? AppleScript.run("tell application \"\(name)\" to get player state as string"), state != "stopped" { return name }
+            if let state = try? await AppleScript.run("tell application \"\(name)\" to get player state as string"), state != "stopped" { return name }
         }
         return nil
     }
 
-    private static func mediaPlayback(_ action: SystemAction) throws -> String {
-        let player = activePlayer() ?? ["Spotify", "Music"].first { name in
+    private static func mediaPlayback(_ action: SystemAction) async throws -> String {
+        let player = await activePlayer() ?? ["Spotify", "Music"].first { name in
             NSWorkspace.shared.runningApplications.contains { $0.localizedName == name }
         }
         if let player {
             let verb = action == .play ? "play" : (action == .pause ? "pause" : "playpause")
-            try AppleScript.run("tell application \"\(player)\" to \(verb)")
+            try await AppleScript.run("tell application \"\(player)\" to \(verb)")
         } else {
             Keyboard.mediaKey(Keyboard.mediaPlay)
         }

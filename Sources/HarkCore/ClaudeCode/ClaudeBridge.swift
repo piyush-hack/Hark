@@ -23,7 +23,7 @@ public enum ClaudeBridge {
         let directory = latestProjectDirectory() ?? Paths.home.path
         let claude = ClaudeBrain.binary?.path ?? "claude"
         let command = "cd \(shellQuote(directory)) && \(shellQuote(claude)) --continue \(shellQuote(prompt))"
-        try AppleScript.run("""
+        try await AppleScript.run("""
         tell application "Terminal"
             activate
             do script \(AppleScript.quote(command))

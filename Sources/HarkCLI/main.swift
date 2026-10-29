@@ -131,7 +131,7 @@ case "text":
     print(text.prefix(1500))
 
 case "screen":
-    let snapshot = await MainActor.run { AX.snapshot(browser: Browser()) }
+    let snapshot = await Task { @MainActor in await AX.snapshot(browser: Browser()) }.value
     print("accessibility trusted: \(AX.isTrusted())")
     print(snapshot.describe())
 

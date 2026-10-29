@@ -13,6 +13,7 @@ final class Permissions: ObservableObject {
     @Published var automation: State = .unknown
     @Published var fullDiskAccess: State = .unknown
     private var timer: Timer?
+    private var checkingAutomation = false
 
     /// Polls only while the window is open (so grants show up live), never in the background.
     func startPolling() {
@@ -37,7 +38,7 @@ final class Permissions: ObservableObject {
         }
         set(\.accessibility, AX.isTrusted() ? .granted : .unknown)
         set(\.screenRecording, CGPreflightScreenCaptureAccess() ? .granted : .unknown)
-        set(\.automation, automationState(bundleID: "com.google.Chrome"))
+        refreshAutomation(bundleID: "com.google.Chrome")
         // The system privacy database is readable only with Full Disk Access.
         let tcc = Paths.home.appendingPathComponent("Library/Application Support/com.apple.TCC/TCC.db").path
         let readable = FileHandle(forReadingAtPath: tcc).map { try? $0.close(); return true } ?? false
@@ -48,10 +49,27 @@ final class Permissions: ObservableObject {
         if self[keyPath: key] != value { self[keyPath: key] = value }
     }
 
-    private func automationState(bundleID: String) -> State {
+    /// The answer can take minutes while the app is busy or launching, so it's asked off the main thread, one at a time.
+    private func refreshAutomation(bundleID: String) {
         guard NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first != nil else {
-            return automation == .granted ? .granted : .unknown
+            set(\.automation, automation == .granted ? .granted : .unknown)
+            return
         }
+        guard !checkingAutomation else { return }
+        checkingAutomation = true
+        Task.detached { [weak self] in
+            let state = Permissions.automationState(bundleID: bundleID)
+            await self?.finishAutomationCheck(state)
+        }
+    }
+
+    private func finishAutomationCheck(_ state: State) {
+        checkingAutomation = false
+        if state != automation { Log.info("Automation permission for Google Chrome: \(state)") }
+        set(\.automation, state)
+    }
+
+    nonisolated private static func automationState(bundleID: String) -> State {
         var address = AEAddressDesc()
         let status: OSStatus = bundleID.withCString { pointer in
             AECreateDesc(typeApplicationBundleID, pointer, strlen(pointer), &address)
@@ -82,9 +100,9 @@ final class Permissions: ObservableObject {
 
     func requestAutomation() {
         Task {
-            _ = try? AppleScript.run("tell application \"System Events\" to get name of first process")
+            _ = try? await AppleScript.run("tell application \"System Events\" to get name of first process")
             if NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == "com.google.Chrome" }) {
-                _ = try? AppleScript.run("tell application \"Google Chrome\" to count windows")
+                _ = try? await AppleScript.run("tell application \"Google Chrome\" to count windows")
             }
             refresh()
         }
