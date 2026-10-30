@@ -102,7 +102,7 @@ cat >> "$NOTES" <<EOF
 
 ---
 
-**New to Hark?** Download **Hark-$VERSION.dmg**, open it, and drag Hark to Applications. Hark is signed but not notarized by Apple, so the first time you open it macOS will say it can't check it:
+**New to Hark?** Download **Hark-$VERSION.dmg**, open it, and drag Hark to Applications. Hark is signed but not notarized by Apple, so the first time you open it macOS will say it can't verify it. Click **Done** (not Move to Trash, which deletes it), then:
 - **macOS 15 and later:** open System Settings → Privacy & Security, scroll down, and click **Open Anyway** next to Hark.
 - **macOS 14:** Control-click Hark in Applications, choose **Open**, then **Open** again.
 

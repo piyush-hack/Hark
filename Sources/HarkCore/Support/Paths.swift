@@ -12,15 +12,24 @@ public enum Paths {
         process.executableURL = URL(fileURLWithPath: shell)
         process.arguments = ["-ilc", "printf '%s' \"$PATH\""]
         let pipe = Pipe()
+        // Read as output arrives; never wait for end-of-file. Shell startups that leave a helper running (gitstatusd,
+        // agents, `cmd &`) keep the pipe open forever, which used to hang this — and everything waiting on it — for good.
+        let output = LockedText()
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty { handle.readabilityHandler = nil } else { output.append(chunk) }
+        }
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         guard (try? process.run()) != nil else { return fallback }
         let deadline = Date().addingTimeInterval(4)
         while process.isRunning, Date() < deadline { usleep(20_000) }
-        if process.isRunning { process.terminate(); return fallback }
-        let path = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .components(separatedBy: "\n").last?.trimmingCharacters(in: .whitespaces) ?? ""
+        if process.isRunning { process.terminate() }
+        let settle = Date().addingTimeInterval(0.5)
+        while !output.text.contains("/usr/bin"), Date() < settle { usleep(10_000) }
+        pipe.fileHandleForReading.readabilityHandler = nil
+        let path = output.text.components(separatedBy: "\n").last?.trimmingCharacters(in: .whitespaces) ?? ""
         guard path.contains("/usr/bin") else { return fallback }
         // Keep Homebrew and the system folders even if the shell profile left them out.
         let parts = path.split(separator: ":").map(String.init)
@@ -45,4 +54,11 @@ public enum Paths {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+}
+
+private final class LockedText: @unchecked Sendable {
+    private var data = Data()
+    private let lock = NSLock()
+    func append(_ chunk: Data) { lock.lock(); data.append(chunk); lock.unlock() }
+    var text: String { lock.lock(); defer { lock.unlock() }; return String(decoding: data, as: UTF8.self) }
 }

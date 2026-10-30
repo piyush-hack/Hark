@@ -168,6 +168,8 @@ public final class HarkEngine: ObservableObject {
 
     /// Call once at launch from the app (not from the CLI).
     public func start() {
+        // Read the login shell's PATH now, off the main thread, so nothing on it ever waits for the shell.
+        DispatchQueue.global(qos: .utility).async { _ = Paths.shellPATH }
         scheduler.onFire = { [weak self] automation, context in self?.automationFired(automation, context: context) }
         scheduler.start()
         housekeeping = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in

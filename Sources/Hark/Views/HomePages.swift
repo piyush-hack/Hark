@@ -9,7 +9,7 @@ struct WelcomePage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 26) {
-                LiveOrb(meter: engine.meter, mood: engine.phase == .idle ? .listening : engine.phase.mood, size: 120)
+                LiveOrb(meter: engine.meter, mood: engine.phase.mood, size: 120)
                     .padding(.top, 40)
                 VStack(spacing: 10) {
                     Text("Your Mac, by voice.")

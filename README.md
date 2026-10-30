@@ -40,7 +40,7 @@
 ## Install
 
 1. Download **Hark-x.y.z.dmg** from [Releases](https://github.com/piyush-hack/Hark/releases/latest), open it, and drag Hark to **Applications**.
-2. Open Hark. It is signed but not notarized by Apple, so the first time macOS says it can't check it:
+2. Open Hark from Applications. It is signed but not notarized by Apple, so the first time macOS says it can't verify it. Click **Done** (not **Move to Trash**, which deletes it), then:
    - **macOS 15 and later:** System Settings → Privacy & Security → scroll down → **Open Anyway**.
    - **macOS 14:** Control-click Hark in Applications → **Open** → **Open**.
 3. Install [Claude Code](https://claude.com/claude-code) and sign in, if you haven't.
