@@ -170,10 +170,11 @@ final class Updater: ObservableObject {
     /// Automatic checks show the window without taking focus, so typing in another app never lands in it.
     private func present(activate: Bool) {
         if window == nil {
-            let host = NSHostingController(rootView: UpdateView().environmentObject(self))
-            host.sizingOptions = [.preferredContentSize]
-            let window = NSWindow(contentViewController: host)
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
+            // Clickable on the first click even when shown without focus; the window follows the view's size.
+            let host = ClickableHostingView(rootView: UpdateView().environmentObject(self))
+            let window = NSWindow(contentRect: NSRect(origin: .zero, size: host.fittingSize),
+                                  styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.contentView = host
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.isReleasedWhenClosed = false
