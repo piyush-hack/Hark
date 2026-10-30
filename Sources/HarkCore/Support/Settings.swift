@@ -24,6 +24,10 @@ public struct HarkSettings: Codable, Equatable, Sendable {
     /// Auto mode: sensitive actions (send, delete, buy, risky shell commands) run without asking.
     public var autoApprove = false
     public var onboardingDone = false
+    /// Ask GitHub for a newer Hark at launch and every few hours, and offer it in a window.
+    public var checkForUpdates = true
+    /// A release the user chose to skip; automatic checks stay quiet about it.
+    public var skippedVersion: String?
     /// Secret required by hark://run links, so web pages can't drive your Mac.
     public var urlKey = HarkSettings.newKey()
 
@@ -51,6 +55,8 @@ public struct HarkSettings: Codable, Equatable, Sendable {
         autoApprove = try c.decodeIfPresent(Bool.self, forKey: .autoApprove) ?? defaults.autoApprove
         voiceMatch = try c.decodeIfPresent(Bool.self, forKey: .voiceMatch) ?? defaults.voiceMatch
         onboardingDone = try c.decodeIfPresent(Bool.self, forKey: .onboardingDone) ?? defaults.onboardingDone
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? defaults.checkForUpdates
+        skippedVersion = try c.decodeIfPresent(String.self, forKey: .skippedVersion)
         urlKey = try c.decodeIfPresent(String.self, forKey: .urlKey) ?? defaults.urlKey
     }
 

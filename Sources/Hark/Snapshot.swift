@@ -6,7 +6,7 @@ import SwiftUI
 /// Used for docs and design review; needs no permissions.
 @MainActor
 enum Snapshot {
-    static func run(into directory: URL, engine: HarkEngine, permissions: Permissions) {
+    static func run(into directory: URL, engine: HarkEngine, permissions: Permissions, updater: Updater) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let nav = NavigationModel.shared
 
@@ -16,11 +16,33 @@ enum Snapshot {
                 nav.page = page
                 let root = MainView()
                     .environmentObject(engine).environmentObject(engine.scheduler)
-                    .environmentObject(permissions).environmentObject(nav)
+                    .environmentObject(permissions).environmentObject(updater).environmentObject(nav)
                 render(root, size: NSSize(width: 980, height: 660), appearance: appearance,
                        to: directory.appendingPathComponent("page-\(page.rawValue)-\(suffix).png"))
             }
         }
+
+        let release = Release(version: AppVersion("0.3.0")!, notes: """
+            ## What's new
+            - **Updates install themselves.** Hark checks for a new version and offers it here.
+            - Dictation keeps your place after “scratch that”.
+            - Faster first answer after waking from sleep.
+            """, page: URL(string: "https://github.com")!, archive: URL(string: "https://github.com/Hark.zip"), archiveSize: 7_900_000)
+        let updates: [(String, Updater.Phase, Release?)] = [
+            ("available", .available, release), ("downloading", .downloading(0.42), release),
+            ("failed", .failed("The download isn't signed like this copy of Hark, so it wasn't installed."), release),
+            ("up-to-date", .upToDate, nil),
+        ]
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            for (name, phase, release) in updates {
+                updater.preview(phase, release: release)
+                let view = UpdateView().environmentObject(updater).background(Color(nsColor: .windowBackgroundColor))
+                let size = NSHostingView(rootView: view).fittingSize
+                render(view, size: size, appearance: appearance,
+                       to: directory.appendingPathComponent("update-\(name)-\(appearance == .aqua ? "light" : "dark").png"))
+            }
+        }
+        updater.preview(.idle, release: nil)
 
         let states: [(String, () -> Void)] = [
             ("listening", { engine.preview(phase: .listening, transcript: "Open Chrome, open a new tab and search for the best ramen in", level: 0.7) }),

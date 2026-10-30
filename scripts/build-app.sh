@@ -5,11 +5,12 @@
 #
 #   scripts/build-app.sh            # release build
 #   scripts/build-app.sh --open     # build, then launch
+#   HARK_APP=dist/Hark.app scripts/build-app.sh   # build somewhere else (release.sh does)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${CONFIG:-release}"
-APP="build/Hark.app"
+APP="${HARK_APP:-build/Hark.app}"
 
 echo "→ Compiling ($CONFIG)…"
 swift build -c "$CONFIG" --product Hark

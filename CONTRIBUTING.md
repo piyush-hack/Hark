@@ -26,6 +26,24 @@ Requirements: Apple Silicon, macOS 14+, Swift 5.10+, and Claude Code signed in (
 - Brain: `harkctl agent "…" --dry` runs Claude with simulated tools; `--model=sonnet` to compare; `||` separates requests in one session.
 - End to end: `harkctl run "…"` really executes.
 
+## Releasing a new version
+
+1. Write what changed, in plain words, to a file (it becomes the update window's text):
+
+   ```markdown
+   ## What's new
+   - **Updates install themselves.** Hark offers new versions in a window.
+   - Dictation keeps your place after “scratch that”.
+   ```
+
+2. With a clean working tree on `main`: `make publish VERSION=0.3.0 NOTES=whats-new.md`.
+
+   This bumps `Resources/Info.plist`, builds and signs `dist/Hark-0.3.0.dmg` and `.zip`, commits “Release v0.3.0”, tags `v0.3.0`, pushes, and creates the GitHub release with both files. It uses the gh account `HARK_GH_USER` (default: the repository owner) without switching your active one.
+
+3. Running copies pick it up at their next launch or within six hours. To try the update window before publishing, run `make release VERSION=…`, write a GitHub-style release JSON pointing at the zip with a `file://` URL, and launch an older build with `open --env HARK_UPDATE_FEED=file:///…/latest.json Hark.app`.
+
+Versions must go up (0.2.0 → 0.2.1 → 0.3.0): installed copies compare numbers and only offer newer ones. Release from the Mac that holds the “Hark Local Signing” identity (or your `HARK_SIGN_IDENTITY`). The updater refuses builds signed by anyone else, and macOS keeps each user's permissions only while the signature stays the same.
+
 ## Pull requests
 
 Keep them focused, include tests for parser or engine changes, and describe how you verified the change.

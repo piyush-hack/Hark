@@ -361,6 +361,7 @@ struct PermissionsPage: View {
 
 struct AboutPage: View {
     @EnvironmentObject var engine: HarkEngine
+    @EnvironmentObject var updater: Updater
 
     var body: some View {
         PageScaffold(title: "About Hark") {
@@ -373,6 +374,20 @@ struct AboutPage: View {
                             .font(.system(size: 12.5)).foregroundStyle(.secondary)
                         Text("A voice agent for macOS.").font(.system(size: 12.5)).foregroundStyle(.secondary)
                     }
+                }
+            }
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Updates").font(.system(size: 14, weight: .semibold))
+                            Text(updateStatus).font(.system(size: 12)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if updater.phase == .checking { ProgressView().controlSize(.small) }
+                        Button(updater.release == nil ? "Check Now" : "Update…", action: updater.checkNow).disabled(updater.isWorking)
+                    }
+                    Toggle("Check for updates automatically", isOn: $engine.settings.checkForUpdates)
                 }
             }
             Card {
@@ -391,12 +406,23 @@ struct AboutPage: View {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Privacy").font(.system(size: 14, weight: .semibold))
-                    Text("Audio is processed in memory and never saved; speech recognition (Parakeet via FluidAudio) runs on this Mac. Requests that need thinking go to Claude through your Claude Code sign-in, with the screen or page text they need. Hark sends nothing else.")
+                    Text("Audio is processed in memory and never saved; speech recognition (Parakeet via FluidAudio) runs on this Mac. Requests that need thinking go to Claude through your Claude Code sign-in, with the screen or page text they need. Update checks ask GitHub for the newest version number. Hark sends nothing else.")
                         .font(.system(size: 12.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text("Built on FluidAudio (Apache 2.0), NVIDIA Parakeet (CC-BY-4.0), Silero VAD (MIT), and Claude Code.")
                         .font(.system(size: 11.5)).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
                 }
             }
+        }
+    }
+}
+
+extension AboutPage {
+    var updateStatus: String {
+        if let release = updater.release { return "Hark \(release.version) is available — you have \(updater.current)." }
+        switch updater.phase {
+        case .checking: return "Checking…"
+        case .upToDate: return "You're up to date."
+        default: return engine.settings.checkForUpdates ? "Hark looks for a new version at launch and every few hours." : "Automatic checks are off."
         }
     }
 }

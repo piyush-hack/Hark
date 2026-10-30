@@ -7,6 +7,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let engine = HarkEngine()
     let permissions = Permissions()
+    private(set) lazy var updater = Updater(engine: engine)
     private let hotkey = HotkeyMonitor()
     private var hud: HUDController!
     private var highlighter: HighlightController!
@@ -19,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < CommandLine.arguments.count {
             permissions.refresh()
-            Snapshot.run(into: URL(fileURLWithPath: CommandLine.arguments[index + 1]), engine: engine, permissions: permissions)
+            Snapshot.run(into: URL(fileURLWithPath: CommandLine.arguments[index + 1]), engine: engine, permissions: permissions, updater: updater)
             NSApp.terminate(nil)
             return
         }
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hud = HUDController(engine: engine)
         highlighter = HighlightController(engine: engine)
         setUpStatusItem()
+        updater.start()
 
         hotkey.dictationEnabled = engine.settings.dictationEnabled
         hotkey.onPress = { [weak self] mode in
@@ -70,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// hark://run?key=…&text=open%20chrome — run a command (Shortcuts, Raycast, scripts). The key (About page)
-    /// stops web pages from driving your Mac. hark://open — show the window.
+    /// stops web pages from driving your Mac. hark://open — show the window. hark://update — check for a new version.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "hark" {
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -91,6 +93,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard key == engine.settings.urlKey, let ops = items.first(where: { $0.name == "ops" })?.value else { continue }
                 lastExternalApp?.activate()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in Task { await self?.engine.debugEdit(ops) } }
+            case "update":
+                if items.contains(where: { $0.name == "install" && $0.value == "1" }), key == engine.settings.urlKey {
+                    updater.checkAndInstall()
+                } else {
+                    updater.checkNow()
+                }
             case "bench":
                 guard key == engine.settings.urlKey, let dir = items.first(where: { $0.name == "dir" })?.value else { continue }
                 Task { await engine.benchmark(folder: URL(fileURLWithPath: dir)) }
@@ -148,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(item("Open Hark…", #selector(openHome), key: ","))
         menu.addItem(item("Automations", #selector(openAutomations)))
+        menu.addItem(item(updater.release.map { "Update to Hark \($0.version)…" } ?? "Check for Updates…", #selector(checkForUpdates)))
         menu.addItem(.separator())
         let auto = item("Auto-Approve Sensitive Actions", #selector(toggleAutoApprove))
         auto.state = engine.settings.autoApprove ? .on : .off
@@ -167,6 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openHome() { showMainWindow(page: .home) }
     @objc private func stopHark() { engine.stopEverything() }
     @objc private func openAutomations() { showMainWindow(page: .automations) }
+    @objc private func checkForUpdates() { updater.checkNow() }
     @objc private func toggleAutoApprove() { engine.settings.autoApprove.toggle() }
     @objc private func resetIsland() { hud.resetPosition() }
     @objc private func freeMemory() { Task { await engine.unloadEverything() } }
@@ -188,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 .environmentObject(engine)
                 .environmentObject(engine.scheduler)
                 .environmentObject(permissions)
+                .environmentObject(updater)
                 .environmentObject(NavigationModel.shared))
             window.center()
             window.setFrameAutosaveName("HarkMain")

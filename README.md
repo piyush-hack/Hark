@@ -37,10 +37,20 @@
   <img src="docs/images/home-dark.png" width="820" alt="Hark home window">
 </p>
 
+## Install
+
+1. Download **Hark-x.y.z.dmg** from [Releases](https://github.com/piyush-hack/Hark/releases/latest), open it, and drag Hark to **Applications**.
+2. Open Hark. It is signed but not notarized by Apple, so the first time macOS says it can't check it:
+   - **macOS 15 and later:** System Settings → Privacy & Security → scroll down → **Open Anyway**.
+   - **macOS 14:** Control-click Hark in Applications → **Open** → **Open**.
+3. Install [Claude Code](https://claude.com/claude-code) and sign in, if you haven't.
+
+After that, Hark keeps itself current: it checks GitHub at launch and every few hours, and when there's a new version a window shows what changed with **Install and Relaunch**. Updates keep your permissions and settings. Turn checks off, or check now, on the About page or from the menu bar (**Check for Updates…**).
+
 ## Requirements
 
 - Apple Silicon Mac, macOS 14 Sonoma or later
-- Xcode 15.4+ command-line tools (Swift 5.10)
+- Xcode 15.4+ command-line tools (Swift 5.10), to build from source
 - ~1 GB disk for speech models
 - [Claude Code](https://claude.com/claude-code), signed in with your Claude account (it is Hark's brain — no API key needed)
 
@@ -54,6 +64,15 @@ make run        # builds, signs, and launches build/Hark.app (needs Claude Code 
 On first launch Hark walks you through **Microphone** and **Accessibility** access (required), plus optional **Screen Recording** (OCR fallback) and **Automation** (Chrome/Safari control, asked on first use). The first time the speech model loads, macOS compiles it for the Neural Engine — about 30 seconds, once.
 
 `build-app.sh` signs with a self-signed “Hark Local Signing” identity kept in its own keychain, so your permission grants survive rebuilds. Set `HARK_SIGN_IDENTITY="Developer ID Application: …"` to sign with your own certificate.
+
+## Releasing
+
+```bash
+make release VERSION=0.3.0                     # dist/Hark-0.3.0.dmg (to share) + .zip (what the updater installs)
+make publish VERSION=0.3.0 NOTES=whats-new.md  # also commit the version, tag v0.3.0, push, and create the GitHub release
+```
+
+Every installed copy (0.2.0 and later) sees the release within a few hours and offers it. The notes file is what the update window shows; without one, the commit subjects since the last release are used. The updater installs a download only if it is signed by the same identity as the running copy, so **always release from the Mac that holds the signing identity** (`~/Library/Keychains/hark-signing.keychain-db`; back it up). Releasing with a different identity means everyone has to reinstall by hand and grant permissions again. See [CONTRIBUTING.md](CONTRIBUTING.md#releasing-a-new-version).
 
 ## What to say
 
@@ -110,7 +129,7 @@ Sources/
   Hark/              The menu-bar app: hotkey, floating island, main window
   HarkCLI/           harkctl — test any layer from the terminal
 Tests/               Parser and streaming tests
-scripts/             build-app.sh, make-icon.swift, dev-signing.sh
+scripts/             build-app.sh, release.sh, make-icon.swift, dev-signing.sh
 ```
 
 ## Developing
@@ -123,12 +142,14 @@ open -g "hark://edit?key=$KEY&ops=[…]"              # raw edit steps, logging 
 .build/release/harkctl listen clip.wav      # stream a recording through VAD + parser like the live mic
 .build/release/harkctl agent "summarize this page" --dry   # Claude plans with simulated tools
 .build/release/harkctl run "set the volume to 20 percent"  # really do it
-make snapshots                              # render every screen to build/snapshots
+make snapshots                              # render every screen and the update window to build/snapshots
+HARK_UPDATE_FEED=file:///path/latest.json   # point the updater at a test feed (GitHub release JSON) instead of GitHub
+open -g "hark://update"                     # check for updates now (with key and &install=1: install without asking)
 ```
 
 ## Privacy
 
-Audio is processed in memory and never written to disk. Transcription and reasoning are local. Hark's only network traffic is model downloads and the pages you ask it to open. Activity history and a plain-text log (`hark.log`) live in `~/Library/Application Support/Hark/`; history can be cleared from the Home screen.
+Audio is processed in memory and never written to disk. Transcription and reasoning are local. Hark's only network traffic is model downloads, the pages you ask it to open, and update checks (a request to GitHub for the newest version number; turn it off on the About page). Activity history and a plain-text log (`hark.log`) live in `~/Library/Application Support/Hark/`; history can be cleared from the Home screen.
 
 ## Credits
 

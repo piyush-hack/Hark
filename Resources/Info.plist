@@ -47,6 +47,8 @@
             </array>
         </dict>
     </array>
+    <key>HarkUpdateFeed</key>
+    <string>https://api.github.com/repos/piyush-hack/Hark/releases/latest</string>
     <key>NSHumanReadableCopyright</key>
     <string>MIT License</string>
 </dict>
