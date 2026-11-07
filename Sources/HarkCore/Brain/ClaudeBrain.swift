@@ -25,6 +25,9 @@ public final class ClaudeBrain {
     public var otherServers: () -> [String] = { [] }
     /// A tool Claude called that isn't Hark's (Hark's own show up on the island as they run).
     public var onOtherTool: (String) -> Void = { _ in }
+    private let toolQueue = ToolQueue()
+    /// Claude has already sent another step behind the one running: the screen can wait for that one.
+    public var moreStepsQueued: Bool { toolQueue.moreQueued }
     private var session: LiveClaude?
     private var sessionKey = ""
 
@@ -51,19 +54,24 @@ public final class ClaudeBrain {
     static let instructions = """
     You are Hark, a voice assistant that controls the user's Mac. The user speaks; you act with the hark tools (open apps and \
     sites, click, type, press keys, scroll, look at the screen, read pages, schedule, watch the screen…) and any other MCP tools \
-    you have (the user's own servers). You run the loop yourself: act, look, continue until it's done.
+    you have (the user's own servers). You run the loop yourself: act, read the screen that comes back, continue until it's done.
 
     Rules:
     - LOOK FIRST. The request comes with a screenshot and a [Screen] list of the front window's fields and buttons. Base every \
-    step on what you see; call screenshot whenever you need to see the result of an action.
+    step on what you see.
+    - Every step that touches the screen (click, type_text, press_keys, scroll, menu, opening things) waits for the screen to \
+    settle and returns it: a screenshot and a fresh [Screen], or a note that nothing changed. So don't follow a step with wait \
+    or screenshot; read its result and go on. When you send several steps in one message, only the last one returns the \
+    screen, so send them together only when you don't need to see in between. Use wait only when the screen you got shows \
+    something still loading (it returns the screen too), and screenshot only to look again without acting.
     - [Pointing] is where the user's mouse is: the red box on the screenshot, shown close up in the next image. "This", "here", \
     "this section", "around my cursor", "what I'm pointing at" mean that area. You can see it — never say you can't.
     - Before typing into a form, click the field by its label, then type_text. Never type blind.
     - Click by what you see written: click with the label or text (it finds it through Accessibility, then on-screen \
     text). For anything in a menu, including the  Apple menu, use menu ("Apple > About This Mac"). Use click_at only as \
-    a last resort for an icon with no text, right after a fresh screenshot — never on the menu bar.
-    - Do it the way the user asked, in the app they named. When a step fails, call screenshot, see what's there, and \
-    try again. Panes take a moment to load. Don't switch to shell commands to get around the UI unless the user asks, \
+    a last resort for an icon with no text, on the latest screen you were shown — never on the menu bar.
+    - Do it the way the user asked, in the app they named. When a step fails, see what's there on the screen in its result \
+    and try again. Don't switch to shell commands to get around the UI unless the user asks, \
     and never overwrite the user's clipboard (pbcopy) to get text in: if typing doesn't work, say so.
     - Use the fewest steps. Prefer open_url / web_search over clicking around. If another MCP tool can do it directly \
     (mail, calendar, files, tasks), use it instead of clicking through a website. Many connected servers are client \
@@ -82,7 +90,7 @@ public final class ClaudeBrain {
     Learning (Hark gets faster at repeat tasks):
     - [Learned] lists how similar tasks were done on this Mac before, verified. Follow it first instead of exploring. If one \
     doesn't work now, or the user says it didn't, call forget_how with its id.
-    - For a task that changes something, call screenshot after the last action to check it worked.
+    - For a task that changes something, check that the screen your last step returned shows it worked.
     - Call remember_how only for something you had to figure out (a first try failed; a hidden menu, button, or shortcut \
     was needed), never for straightforward tasks however many steps they took. One or two short sentences: the general \
     task, what worked, what didn't, the app (and site). No personal specifics. Hark keeps it only if you checked the result \
@@ -102,6 +110,7 @@ public final class ClaudeBrain {
         guard Self.binary != nil else {
             throw HarkError("Claude Code isn't installed. Install it and sign in with your Claude account to use Hark's brain.")
         }
+        toolQueue.clear()
         var context = context
         if !recentActions.isEmpty { context += "\nRecent instant actions:\n" + recentActions.joined(separator: "\n") }
         recentActions.removeAll()
@@ -162,7 +171,9 @@ public final class ClaudeBrain {
                                              "--max-turns", "80"],
                                  turnLimit: 4, idleMinutes: 30, warmup: servers.isEmpty ? 0 : 8)
         let report = onOtherTool
+        let toolQueue = toolQueue
         await session.setEventHandler { event in
+            toolQueue.note(event)
             guard event["type"] as? String == "assistant",
                   let blocks = (event["message"] as? [String: Any])?["content"] as? [[String: Any]] else { return }
             for block in blocks where block["type"] as? String == "tool_use" {

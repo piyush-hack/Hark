@@ -11,6 +11,17 @@ public struct ToolCall: Sendable {
 
 /// Everything the brain can ask Hark to do. Described in JSON-schema style; ClaudeBrain renders it as text.
 public enum Tools {
+    /// Steps that change what's on screen, so their results come back with the screen as it then stands: how long to give
+    /// it to start moving, and the longest to watch it. Opening something can take a while to show; typing shows at once.
+    /// `wait` is its own delay.
+    public static let settling: [String: (reaction: TimeInterval, limit: TimeInterval)] = {
+        var times: [String: (reaction: TimeInterval, limit: TimeInterval)] = ["wait": (0, 0)]
+        for name in ["open_app", "quit_app", "open_url", "web_search", "browser", "open_search_result"] { times[name] = (1.5, 4) }
+        for name in ["click", "click_at", "menu", "press_keys"] { times[name] = (0.7, 2.5) }
+        for name in ["type_text", "scroll"] { times[name] = (0.3, 1.5) }
+        return times
+    }()
+
     public static let all: [[String: Any]] = {
         func tool(_ name: String, _ description: String, _ params: [(String, String, String)] = [], required: [String] = [],
                   enums: [String: [String]] = [:]) -> [String: Any] {
@@ -67,7 +78,8 @@ public enum Tools {
             tool("list_tasks", "List scheduled tasks and watchers."),
             tool("cancel_task", "Cancel a scheduled task by number from list_tasks.", [("number", "integer", "Task number")], required: ["number"]),
             tool("claude_code", "Send a prompt to Claude Code (the coding agent).", [("prompt", "string", "What Claude Code should do")], required: ["prompt"]),
-            tool("wait", "Pause before the next step.", [("seconds", "number", "Seconds")], required: ["seconds"]),
+            tool("wait", "Pause, then get the screen. Only for something still loading on the screen you were shown: steps already wait for the screen to settle.",
+                 [("seconds", "number", "Seconds")], required: ["seconds"]),
         ]
     }()
 

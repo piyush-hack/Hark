@@ -84,6 +84,8 @@ public final class HarkEngine: ObservableObject {
     /// When Claude last acted, and last looked at the screen, across requests (learning needs a look after acting).
     private var agentActedAt = Date.distantPast
     private var agentLookedAt = Date.distantPast
+    /// The last full screenshot Claude was given, to tell it plainly when a step changed nothing.
+    private var lastFrame: Data?
     private var agentLessons: [Lesson] = []
     /// How much working out the current Claude run took: enough of it, and Hark asks Claude whether it learned something.
     private var effort = RunEffort()
@@ -207,7 +209,8 @@ public final class HarkEngine: ObservableObject {
         func extra(_ name: String, _ description: String, _ properties: [String: [String: String]], _ required: [String]) -> [String: Any] {
             ["name": name, "description": description, "inputSchema": ["type": "object", "properties": properties, "required": required]]
         }
-        tools.append(extra("screenshot", "See the screen now: a screenshot (with the pointer's area boxed) and the front window's fields and buttons.", [:], []))
+        tools.append(extra("screenshot", "See the screen now: a screenshot (with the pointer's area boxed) and the front window's fields and buttons. "
+                           + "Steps already return the screen, so use this only to look again without acting.", [:], []))
         tools.append(extra("remember_how", "Save how a task is done on this Mac, after you checked on screen that it worked. General, no personal specifics.",
                            ["task": ["type": "string", "description": "General task, e.g. delete a note in Notes"],
                             "how": ["type": "string", "description": "What worked, and what didn't"],
@@ -226,13 +229,7 @@ public final class HarkEngine: ObservableObject {
             effort.looked()
             addStep("Look at the screen", status: .done)
             Log.info("  ↳ Look at the screen")
-            var content: [[String: Any]] = []
-            for image in await screenImages() {
-                content.append(["type": "text", "text": image.label])
-                content.append(["type": "image", "data": image.jpeg.base64EncodedString(), "mimeType": "image/jpeg"])
-            }
-            content.append(["type": "text", "text": "[Screen]\n" + (await screenSummary())])
-            return (content, false)
+            return (await screenContent(await screenImages()), false)
         case "remember_how":
             let task = (arguments["task"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let how = (arguments["how"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -277,10 +274,61 @@ public final class HarkEngine: ObservableObject {
                 agentActedAt = Date()
                 effort.acted(name, call.arguments)
             }
+            let settling = Tools.settling[name]
+            let area = lastShot?.bounds ?? CGDisplayBounds(CGMainDisplayID())
+            let before = (settling?.reaction ?? 0) > 0 ? await RegionFingerprint.capture(area) : nil
             let result = await runTool(call)
-            if result.hasPrefix("Error:") { effort.failed() }
-            return (text(result), result.hasPrefix("Error:"))
+            let failed = result.hasPrefix("Error:")
+            if failed { effort.failed() }
+            guard let settling else { return (text(result), failed) }
+            // A failed step changed nothing to wait for; Claude needs to see why, now.
+            return (text(result) + (await screenAfterStep(failed ? (0, 0) : settling, from: before, in: area)), failed)
         }
+    }
+
+    /// The screen once a step has played out, for that step's result: Claude reads it and goes straight on, with no wait
+    /// or screenshot call of its own. Nothing when Claude already sent another step behind this one; that one brings it.
+    /// It isn't counted as looking around (RunEffort): it comes with every step. It does count as seeing the result.
+    private func screenAfterStep(_ times: (reaction: TimeInterval, limit: TimeInterval), from before: [UInt8]?, in area: CGRect) async -> [[String: Any]] {
+        let started = Date()
+        guard await screenSettled(times, from: before, in: area) else {
+            Log.info("  · Another step is queued: no screen for this one")
+            return []
+        }
+        let seen = lastFrame
+        let images = await screenImages(marked: false)
+        agentLookedAt = Date()
+        let unchanged = seen != nil && images.first?.jpeg == seen
+        let content = unchanged ? [["type": "text", "text": "The screen didn't change."]] : await screenContent(images)
+        Log.info(String(format: "  · Screen after %.2fs%@", Date().timeIntervalSince(started), unchanged ? " (unchanged)" : ""))
+        return content
+    }
+
+    /// Waits until the screen has answered the step. False if Claude queued another step meanwhile, so it needn't wait.
+    private func screenSettled(_ times: (reaction: TimeInterval, limit: TimeInterval), from before: [UInt8]?, in area: CGRect) async -> Bool {
+        guard let before, times.reaction > 0 else {
+            try? await Task.sleep(nanoseconds: UInt64(times.reaction * 1_000_000_000))
+            return !claudeBrain.moreStepsQueued
+        }
+        var settle = ScreenSettle(before: before, reaction: times.reaction, limit: times.limit)
+        let started = Date()
+        while true {
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            if claudeBrain.moreStepsQueued { return false }
+            guard let frame = await RegionFingerprint.capture(area) else { return true }
+            if settle.isDone(frame, at: Date().timeIntervalSince(started)) { return true }
+        }
+    }
+
+    /// Screenshots and the front window's fields and buttons, as MCP content.
+    private func screenContent(_ images: [ScreenImage]) async -> [[String: Any]] {
+        var content: [[String: Any]] = []
+        for image in images {
+            content.append(["type": "text", "text": image.label])
+            content.append(["type": "image", "data": image.jpeg.base64EncodedString(), "mimeType": "image/jpeg"])
+        }
+        content.append(["type": "text", "text": "[Screen]\n" + (await screenSummary())])
+        return content
     }
 
     /// "mcp__claude_ai_Google_Drive__search" → "Google Drive: search".
@@ -1725,8 +1773,9 @@ public final class HarkEngine: ObservableObject {
     }
 
     /// Screenshots for Claude: the whole screen with the pointed-at area boxed in red, plus that area close up.
-    /// Needs Screen Recording; asks once if it's missing.
-    func screenImages() async -> [ScreenImage] {
+    /// Needs Screen Recording; asks once if it's missing. `marked: false` is the plain screen of the same display: the
+    /// pointer's area only matters to the request, not to every step after it.
+    func screenImages(marked: Bool = true) async -> [ScreenImage] {
         guard ScreenText.hasPermission else {
             if !askedForScreen { askedForScreen = true; ScreenText.requestPermission() }
             return []
@@ -1735,18 +1784,20 @@ public final class HarkEngine: ObservableObject {
         guard let (image, bounds) = try? await ScreenText.captureDisplay(containing: pointing?.point) else { return [] }
         let pixels = CGFloat(image.width) / max(bounds.width, 1)
         // The pointed-at area in this image's pixels (top-left origin), when it's on this display.
-        let area = pointing.flatMap { pointing -> CGRect? in
+        let mark = marked ? pointing : nil
+        let area = mark.flatMap { pointing -> CGRect? in
             let visible = pointing.rect.intersection(bounds)
             guard !visible.isNull, visible.width > 20, visible.height > 20 else { return nil }
             return CGRect(x: (visible.minX - bounds.minX) * pixels, y: (visible.minY - bounds.minY) * pixels,
                           width: visible.width * pixels, height: visible.height * pixels).integral
         }
-        let dot = pointing.flatMap { bounds.contains($0.point) ? CGPoint(x: ($0.point.x - bounds.minX) * pixels, y: ($0.point.y - bounds.minY) * pixels) : nil }
+        let dot = mark.flatMap { bounds.contains($0.point) ? CGPoint(x: ($0.point.x - bounds.minX) * pixels, y: ($0.point.y - bounds.minY) * pixels) : nil }
         var images: [ScreenImage] = []
         if let full = Self.jpeg(image, maxWidth: 1400, box: area, dot: dot) {
             let scale = min(1, 1400 / CGFloat(image.width))
             let size = CGSize(width: Int(CGFloat(image.width) * scale), height: Int(CGFloat(image.height) * scale))
             lastShot = (bounds, size)
+            lastFrame = full
             let grid = "\(Int(size.width))×\(Int(size.height)) px — click_at uses these pixel coordinates"
             images.append(ScreenImage(label: area == nil ? "The screen (\(grid)):"
                                       : "The screen (\(grid); red box: the area around the user's mouse pointer; red dot: the pointer):", jpeg: full))
@@ -1970,7 +2021,7 @@ public final class HarkEngine: ObservableObject {
         }
         // Say what is there, so the next try can aim right (by another label, or click_at on the screenshot).
         let visible = await AX.snapshot(browser: browser).describe(maxElements: 30)
-        throw HarkError("I couldn't find “\(target)” on screen. What's clickable now:\n\(visible)\nLook with screenshot and use click_at if it has no label.")
+        throw HarkError("I couldn't find “\(target)” on screen. What's clickable now:\n\(visible)\nIf it has no label, find it on the screen and use click_at.")
     }
 
     /// The latest screenshot's geometry, so click_at can turn its pixels back into screen points.

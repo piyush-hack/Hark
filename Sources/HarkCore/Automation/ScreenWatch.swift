@@ -123,3 +123,30 @@ public enum RegionFingerprint {
         return Double(changed) / Double(a.count) > 0.02
     }
 }
+
+/// Decides when the screen has finished answering a step, from thumbnails taken as time passes. Two still frames in a row
+/// aren't enough: the old page stays up until the new one arrives. So the screen gets `reaction` to start moving, and once
+/// it has, it must hold still for `quiet`. One that never stops (a video playing) ends at `limit`.
+public struct ScreenSettle: Sendable {
+    public static let quiet: TimeInterval = 0.25
+    private let reaction: TimeInterval
+    private let limit: TimeInterval
+    private var latest: [UInt8]
+    private var movedAt: TimeInterval?
+
+    /// `before` is the thumbnail from just before the step.
+    public init(before: [UInt8], reaction: TimeInterval, limit: TimeInterval) {
+        latest = before
+        self.reaction = reaction
+        self.limit = limit
+    }
+
+    /// Takes the next thumbnail, `elapsed` seconds after the step; true when there's nothing more to wait for.
+    public mutating func isDone(_ frame: [UInt8], at elapsed: TimeInterval) -> Bool {
+        if RegionFingerprint.differs(frame, latest) { movedAt = elapsed }
+        latest = frame
+        if elapsed >= limit { return true }
+        if let movedAt { return elapsed - movedAt >= Self.quiet }
+        return elapsed >= reaction
+    }
+}
