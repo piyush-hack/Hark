@@ -58,8 +58,28 @@ public enum EditorBrain {
     }
 }
 
+extension FileHandle {
+    /// Hands over everything read, strictly in order. A Task per chunk wouldn't: tasks can start out of order, which
+    /// scrambles any line longer than one chunk (every screenshot is), and that line is lost.
+    func readInOrder(_ deliver: @escaping @Sendable (Data) async -> Void) {
+        let (chunks, feed) = AsyncStream<Data>.makeStream()
+        readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+                feed.finish()
+            } else {
+                feed.yield(chunk)
+            }
+        }
+        Task { for await chunk in chunks { await deliver(chunk) } }
+    }
+}
+
 /// A Claude Code session kept running between requests: no process start per request, so each answer is just the
-/// model's time. Sleeps after ten idle minutes; restarts on its own after 30 turns to stay quick.
+/// model's time. Sleeps after ten idle minutes; restarts on its own after 30 turns to stay quick. With a
+/// `conversationKey` it's one ongoing conversation instead: the process can stop or fail and the next one carries on
+/// with `--resume`, until nothing has happened for the idle time.
 public actor LiveClaude {
     public let label: String
     private let systemPrompt: String
@@ -83,10 +103,19 @@ public actor LiveClaude {
     /// and a request sent before then only sees the local servers.
     private let warmup: TimeInterval
     private var startedAt = Date.distantPast
+    private let conversation: ConversationMemory?
+    /// This process was started to carry on a conversation, and whether it got that far: a dead end never reaches `init`.
+    private var resumed = false
+    private var sawInit = false
+    /// The request in flight, to send again if the conversation it was meant for turned out to be gone.
+    private var lastRequest: Data?
+    /// How big the conversation was at Claude's last reply.
+    private var contextTokens = 0
 
     public init(label: String, systemPrompt: String, model: String, timeout: TimeInterval, arguments: [String], turnLimit: Int = 30,
-                idleMinutes: Int = 10, warmup: TimeInterval = 0) {
+                idleMinutes: Int = 10, warmup: TimeInterval = 0, conversationKey: String? = nil) {
         self.idleSeconds = UInt64(idleMinutes * 60)
+        self.conversation = conversationKey.map { ConversationMemory(key: $0, idle: TimeInterval(idleMinutes * 60)) }
         self.warmup = warmup
         self.label = label
         self.systemPrompt = systemPrompt
@@ -126,20 +155,19 @@ public actor LiveClaude {
     }
 
     /// Sends one request made of text and image blocks; returns the model's final reply text.
-    /// `keepOpen`: don't start a fresh session yet even if this one is used up — a follow-up (`followUp: true`) about this
-    /// very request is coming, and it must reach the conversation that remembers it. Then call `restartIfUsedUp`.
-    public func ask(content: [[String: Any]], keepOpen: Bool = false, followUp: Bool = false) async throws -> String {
+    public func ask(content: [[String: Any]]) async throws -> String {
         guard let binary = ClaudeBrain.binary else { throw HarkError("Claude Code isn't installed.") }
         // One request at a time: a background check and a spoken request can't share the one reply slot.
         await acquire()
         defer { release() }
         try Task.checkCancellation()
-        if turns >= turnLimit, !followUp { stop() }  // keep the conversation short, so it stays fast
+        if turns >= turnLimit { stop() }  // keep the conversation short, so it stays fast
         if process == nil { start(binary) }
         let wait = warmup - Date().timeIntervalSince(startedAt)
         if turns == 0, wait > 0 {
             Log.info(String(format: "%@ waiting %.1fs for connectors", label, wait))
             try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+            if process == nil { start(binary) }  // the conversation it tried to carry on was gone
         }
         guard let input else { throw HarkError("\(label) didn't start.") }
         lastUse = Date()
@@ -148,6 +176,7 @@ public actor LiveClaude {
         let id = requestID
         let line = ["type": "user", "message": ["role": "user", "content": content]] as [String: Any]
         let data = try JSONSerialization.data(withJSONObject: line) + Data("\n".utf8)
+        lastRequest = data
         let started = Date()
         let reply: String = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -164,21 +193,18 @@ public actor LiveClaude {
         Log.info(String(format: "%@ answered in %.2fs", label, Date().timeIntervalSince(started)))
         scheduleIdleStop()
         // Used up: start the next session now, so it's warm (its MCP servers connected) for the next request.
-        if turns >= turnLimit, !keepOpen {
+        if turns >= turnLimit {
             stop()
             start(binary)
         }
         return reply
     }
 
-    /// After an `ask` with `keepOpen` and no follow-up: if the session is used up, start the next one now, warm.
-    public func restartIfUsedUp() async {
-        guard turns >= turnLimit, let binary = ClaudeBrain.binary else { return }
-        await acquire()
-        defer { release() }
-        guard turns >= turnLimit else { return }
-        stop()
-        start(binary)
+    /// Has Claude Code summarize a conversation that's grown past `tokens`. A request sent meanwhile waits its turn.
+    public func compact(above tokens: Int) async {
+        guard contextTokens > tokens else { return }
+        Log.info("\(label) summarizing the conversation (\(contextTokens / 1000)k tokens)")
+        _ = try? await ask("/compact")
     }
 
     private var busy = false
@@ -196,8 +222,11 @@ public actor LiveClaude {
     private func start(_ binary: URL) {
         let process = Process()
         process.executableURL = binary
+        let carryOn = conversation?.current()
+        resumed = carryOn != nil
+        sawInit = false
         process.arguments = ["-p", "--model", model, "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                             "--system-prompt", systemPrompt] + arguments
+                             "--system-prompt", systemPrompt] + arguments + (carryOn.map { ["--resume", $0] } ?? [])
         let workdir = Paths.appSupport.appendingPathComponent("claude-brain", isDirectory: true)
         try? FileManager.default.createDirectory(at: workdir, withIntermediateDirectories: true)
         process.currentDirectoryURL = workdir
@@ -209,11 +238,8 @@ public actor LiveClaude {
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
         let owner = self
-        stdout.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if chunk.isEmpty { handle.readabilityHandler = nil; return }
-            Task { await owner.receive(chunk) }
-        }
+        let source = ObjectIdentifier(process)
+        stdout.fileHandleForReading.readInOrder { await owner.receive($0, from: source) }
         process.terminationHandler = { finished in
             let status = finished.terminationStatus
             let id = ObjectIdentifier(finished)
@@ -225,20 +251,30 @@ public actor LiveClaude {
         buffer = Data()
         turns = 0
         startedAt = Date()
-        Log.info("\(label) started")
+        contextTokens = 0
+        Log.info(resumed ? "\(label) started, carrying on the conversation" : "\(label) started")
     }
 
-    private func receive(_ chunk: Data) {
+    private func receive(_ chunk: Data, from source: ObjectIdentifier) {
+        // A stopped process's last words aren't an answer to the request after it.
+        guard let process, ObjectIdentifier(process) == source else { return }
         buffer.append(chunk)
         while let newline = buffer.firstIndex(of: 0x0A) {
             let line = buffer[buffer.startIndex..<newline]
             buffer.removeSubrange(buffer.startIndex...newline)
             guard let json = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { continue }
             onEvent?(json)
+            follow(json)
             guard json["type"] as? String == "result" else { continue }
+            let failed = (json["is_error"] as? Bool) == true
+            if failed, startOverIfResumeFailed() { return }
             let continuation = waiting
             waiting = nil
-            if (json["is_error"] as? Bool) == true {
+            if failed, json["subtype"] as? String == "error_max_turns" {
+                // Nothing is wrong with the session, and it remembers everything: "continue" picks up right here.
+                continuation?.resume(throwing: HarkError("That took more steps than one request allows, so I stopped here. Say continue to carry on."))
+                scheduleIdleStop()
+            } else if failed {
                 continuation?.resume(throwing: HarkError("\(label) couldn't answer (\(json["subtype"] as? String ?? "error")).") )
                 stop()
             } else {
@@ -247,12 +283,44 @@ public actor LiveClaude {
         }
     }
 
+    /// Keeps up with the conversation from what the session prints.
+    private func follow(_ event: [String: Any]) {
+        switch event["type"] as? String {
+        case "system":
+            if event["subtype"] as? String == "init" { sawInit = true }
+            if event["subtype"] as? String == "compact_boundary" { contextTokens = 0 }
+        case "assistant":
+            lastUse = Date()
+            if let id = event["session_id"] as? String { conversation?.save(id) }
+            if let usage = (event["message"] as? [String: Any])?["usage"] as? [String: Any] {
+                contextTokens = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"].reduce(0) { $0 + (usage[$1] as? Int ?? 0) }
+            }
+        default:
+            break
+        }
+    }
+
+    /// `--resume` found no such conversation, so it never reached `init` (an error after that is a real one, and the
+    /// conversation is still good). Starts a new one and sends the request again.
+    private func startOverIfResumeFailed() -> Bool {
+        guard resumed, !sawInit else { return false }
+        Log.info("\(label) couldn't carry on the conversation; starting a new one")
+        conversation?.forget()
+        resumed = false
+        guard waiting != nil, let lastRequest, let binary = ClaudeBrain.binary else { return false }
+        stop()
+        start(binary)
+        input?.write(lastRequest)
+        return true
+    }
+
     /// A process ended. Only the current one matters: an old one finishing after its replacement started is ignored.
     private func ended(_ id: ObjectIdentifier, status: Int32) {
         guard let process, ObjectIdentifier(process) == id else { return }
         Log.info("\(label) process exited (status \(status))")
         self.process = nil
         input = nil
+        if startOverIfResumeFailed() { return }
         waiting?.resume(throwing: HarkError("\(label) stopped."))
         waiting = nil
     }
@@ -285,7 +353,7 @@ public actor LiveClaude {
     }
 
     private func stopIfIdle() {
-        if Date().timeIntervalSince(lastUse) >= Double(idleSeconds) - 10, waiting == nil, process != nil { stop(); Log.info("\(label) asleep") }
+        if Date().timeIntervalSince(lastUse) >= Double(idleSeconds) - 10, waiting == nil, process != nil { conversation?.forget(); stop(); Log.info("\(label) asleep") }
     }
 
 }

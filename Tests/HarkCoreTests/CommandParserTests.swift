@@ -390,6 +390,17 @@ final class NoiseTests: XCTestCase {
             XCTAssertFalse(CommandParser.isNoise(heard), heard)
         }
     }
+
+    func testCarryingOnReachesClaudeNotTheMusic() {
+        let plan = CommandParser(apps: ["Spotify"]).plan
+        for heard in ["Continue", "continue.", "Proceed"] {
+            XCTAssertFalse(CommandParser.isNoise(heard), heard)
+            guard case .agent = plan(heard).first else { return XCTFail("\(heard): \(plan(heard))") }
+        }
+        for heard in ["continue the music", "continue playback", "resume", "resume the song"] {
+            guard case .system(.play, _) = plan(heard).first else { return XCTFail("\(heard): \(plan(heard))") }
+        }
+    }
 }
 
 final class WatcherLabelTests: XCTestCase {

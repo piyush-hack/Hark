@@ -6,6 +6,7 @@ import Foundation
 /// spare screenshot; the last call of a message always finds nothing queued behind it.
 public final class ToolQueue: @unchecked Sendable {
     private var open: Set<String> = []
+    private var message: String?
     private let lock = NSLock()
 
     public init() {}
@@ -16,6 +17,12 @@ public final class ToolQueue: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         switch event["type"] as? String {
         case "assistant":
+            // Claude only answers once it has every result of its last message, so nothing of that one can still be
+            // running: a lost event costs one screen at most, never the rest of the run.
+            if let id = (event["message"] as? [String: Any])?["id"] as? String, id != message {
+                message = id
+                open.removeAll()
+            }
             for block in blocks where block["type"] as? String == "tool_use" {
                 guard let name = block["name"] as? String, name.hasPrefix("mcp__hark__"), let id = block["id"] as? String else { continue }
                 open.insert(id)

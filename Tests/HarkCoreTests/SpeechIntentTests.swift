@@ -76,6 +76,21 @@ final class SpeechIntentCorpusTests: XCTestCase {
     }
 
     /// A second unseen set, generated while the first one was being used for tuning: never looked at before this test ran.
+    func testCarryingOnIsNeverTypedUnlessDictating() {
+        for phrase in ["Continue", "continue.", "Proceed", "proceed."] {
+            for kind in [SpeechIntent.FieldKind.none, .singleLine, .cell, .area] {
+                let fresh = SpeechIntent.Context(kind: kind, dictating: false) { _ in false }
+                guard case .request = SpeechIntent.classify(phrase, in: fresh) else {
+                    return XCTFail("\(phrase) in \(kind): \(SpeechIntent.classify(phrase, in: fresh))")
+                }
+                let dictating = SpeechIntent.Context(kind: kind, dictating: true, recentText: "We should meet tomorrow.") { _ in false }
+                guard case .words = SpeechIntent.classify(phrase, in: dictating) else {
+                    return XCTFail("\(phrase) while dictating in \(kind): \(SpeechIntent.classify(phrase, in: dictating))")
+                }
+            }
+        }
+    }
+
     func testFresh() throws {
         guard Bundle.module.url(forResource: "speech-fresh", withExtension: "json", subdirectory: "Fixtures") != nil else { throw XCTSkip("no fresh set") }
         let result = try Self.evaluate("speech-fresh")

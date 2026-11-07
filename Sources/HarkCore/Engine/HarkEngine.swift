@@ -276,22 +276,24 @@ public final class HarkEngine: ObservableObject {
             }
             let settling = Tools.settling[name]
             let area = lastShot?.bounds ?? CGDisplayBounds(CGMainDisplayID())
-            let before = (settling?.reaction ?? 0) > 0 ? await RegionFingerprint.capture(area) : nil
+            let source = (settling?.reaction ?? 0) > 0 ? await RegionFingerprint.source(for: area) : nil
+            let before = source != nil ? await RegionFingerprint.capture(source!) : nil
             let result = await runTool(call)
             let failed = result.hasPrefix("Error:")
             if failed { effort.failed() }
             guard let settling else { return (text(result), failed) }
             // A failed step changed nothing to wait for; Claude needs to see why, now.
-            return (text(result) + (await screenAfterStep(failed ? (0, 0) : settling, from: before, in: area)), failed)
+            return (text(result) + (await screenAfterStep(failed ? (0, 0, 0) : settling, from: before, source)), failed)
         }
     }
 
     /// The screen once a step has played out, for that step's result: Claude reads it and goes straight on, with no wait
     /// or screenshot call of its own. Nothing when Claude already sent another step behind this one; that one brings it.
     /// It isn't counted as looking around (RunEffort): it comes with every step. It does count as seeing the result.
-    private func screenAfterStep(_ times: (reaction: TimeInterval, limit: TimeInterval), from before: [UInt8]?, in area: CGRect) async -> [[String: Any]] {
+    private func screenAfterStep(_ times: Tools.Settling, from before: [UInt8]?,
+                                 _ source: RegionFingerprint.Source?) async -> [[String: Any]] {
         let started = Date()
-        guard await screenSettled(times, from: before, in: area) else {
+        guard await screenSettled(times, from: before, source) else {
             Log.info("  · Another step is queued: no screen for this one")
             return []
         }
@@ -305,17 +307,18 @@ public final class HarkEngine: ObservableObject {
     }
 
     /// Waits until the screen has answered the step. False if Claude queued another step meanwhile, so it needn't wait.
-    private func screenSettled(_ times: (reaction: TimeInterval, limit: TimeInterval), from before: [UInt8]?, in area: CGRect) async -> Bool {
-        guard let before, times.reaction > 0 else {
+    private func screenSettled(_ times: Tools.Settling, from before: [UInt8]?,
+                               _ source: RegionFingerprint.Source?) async -> Bool {
+        guard let before, let source, times.reaction > 0 else {
             try? await Task.sleep(nanoseconds: UInt64(times.reaction * 1_000_000_000))
             return !claudeBrain.moreStepsQueued
         }
-        var settle = ScreenSettle(before: before, reaction: times.reaction, limit: times.limit)
+        var settle = ScreenSettle(before: before, times: times)
         let started = Date()
         while true {
             try? await Task.sleep(nanoseconds: 120_000_000)
             if claudeBrain.moreStepsQueued { return false }
-            guard let frame = await RegionFingerprint.capture(area) else { return true }
+            guard let frame = await RegionFingerprint.capture(source) else { return true }
             if settle.isDone(frame, at: Date().timeIntervalSince(started)) { return true }
         }
     }
@@ -1730,10 +1733,10 @@ public final class HarkEngine: ObservableObject {
             didn't) and you saw it work on screen, call remember_how with it in one or two short sentences, including what \
             didn't work. A task that was just long but straightforward isn't one. Otherwise reply only "no".
             """)
-        } else {
-            if checked, lessonBook.lessons.count == lessonsBefore { Log.info("Nothing to learn here (\(effort.summary))") }
-            await claudeBrain.finish()
+        } else if checked, lessonBook.lessons.count == lessonsBefore {
+            Log.info("Nothing to learn here (\(effort.summary))")
         }
+        claudeBrain.finish()
         reply = answer
         return answer
     }

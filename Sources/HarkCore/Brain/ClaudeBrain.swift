@@ -25,6 +25,9 @@ public final class ClaudeBrain {
     public var otherServers: () -> [String] = { [] }
     /// A tool Claude called that isn't Hark's (Hark's own show up on the island as they run).
     public var onOtherTool: (String) -> Void = { _ in }
+    /// Past this size the conversation is summarized between requests: a long one gets slow, and its screenshots pile
+    /// up toward the API's 600 images per request (with up to 300 more from one long request on top).
+    private static let longConversation = 300_000
     private let toolQueue = ToolQueue()
     /// Claude has already sent another step behind the one running: the screen can wait for that one.
     public var moreStepsQueued: Bool { toolQueue.moreQueued }
@@ -57,6 +60,8 @@ public final class ClaudeBrain {
     you have (the user's own servers). You run the loop yourself: act, read the screen that comes back, continue until it's done.
 
     Rules:
+    - This is one ongoing conversation: a request may carry on from the last one ("continue", "the next one too", "why did \
+    you stop"). Pick up where you left off.
     - LOOK FIRST. The request comes with a screenshot and a [Screen] list of the front window's fields and buttons. Base every \
     step on what you see.
     - Every step that touches the screen (click, type_text, press_keys, scroll, menu, opening things) waits for the screen to \
@@ -123,7 +128,7 @@ public final class ClaudeBrain {
         let note = screen.images.isEmpty ? "\n\n(No screenshot: Screen Recording isn't allowed for Hark.)" : ""
         content.append(["type": "text", "text": "[Context]\n\(context)\n\n[Request]\n\(request)\(note)"])
         let started = Date()
-        let answer = try await currentSession().ask(content: content, keepOpen: true)
+        let answer = try await currentSession().ask(content: content)
         Log.info(String(format: "Claude (%@) finished in %.1fs", model, Date().timeIntervalSince(started)))
         return answer.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -138,15 +143,16 @@ public final class ClaudeBrain {
     public func followUp(_ text: String) async throws {
         // Same session that did the task, never a fresh one — it has to remember what just happened.
         guard let session else { return }
-        _ = try await session.ask(content: [["type": "text", "text": text]], followUp: true)
+        _ = try await session.ask(content: [["type": "text", "text": text]])
     }
 
-    /// The request is over, with no follow-up: a used-up session starts its successor now, so the next request is warm.
-    public func finish() async {
-        await session?.restartIfUsedUp()
+    /// The request is over. Summarizing a long conversation takes a while, so the answer doesn't wait for it.
+    public func finish() {
+        guard let session else { return }
+        Task { await session.compact(above: Self.longConversation) }
     }
 
-    /// Stops whatever Claude is doing (the island's Stop); the next request starts a fresh session.
+    /// Stops whatever Claude is doing (the island's Stop); the next request carries on the same conversation.
     public func cancel() async {
         await session?.stop()
     }
@@ -168,8 +174,8 @@ public final class ClaudeBrain {
                                  arguments: ["--mcp-config", config, "--permission-mode", "dontAsk",
                                              "--allowedTools", (allowed + ["WebSearch", "WebFetch"]).joined(separator: ","),
                                              "--disallowedTools", "Bash,Edit,Write,NotebookEdit,Read,Glob,Grep,Task,advisor",
-                                             "--max-turns", "80"],
-                                 turnLimit: 4, idleMinutes: 30, warmup: servers.isEmpty ? 0 : 8)
+                                             "--max-turns", "300"],
+                                 turnLimit: .max, idleMinutes: 30, warmup: servers.isEmpty ? 0 : 8, conversationKey: "BrainConversation")
         let report = onOtherTool
         let toolQueue = toolQueue
         await session.setEventHandler { event in

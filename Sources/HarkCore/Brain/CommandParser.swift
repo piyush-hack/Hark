@@ -473,6 +473,9 @@ public struct CommandParser {
                                            "right", "sure", "hey", "hi", "hello", "wow", "oops", "peace", "bye", "thanks", "cool", "nice",
                                            "alright", "so", "well"]
 
+    /// One word that's a whole request: it picks up what Hark was doing.
+    static let carryOn: Set<String> = ["continue", "proceed"]
+
     /// Only fillers ("uh", "mm-hmm", "okay"). While you're writing, short real words ("are you okay") are content.
     public static func isFiller(_ text: String) -> Bool {
         let words = text.lowercased().components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'-")).inverted)
@@ -483,7 +486,7 @@ public struct CommandParser {
     public static func isNoise(_ text: String) -> Bool {
         let words = text.lowercased().components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'-")).inverted)
             .filter { !$0.isEmpty }
-        guard words.count > 1 else { return true }
+        guard words.count > 1 || words.first.map(Self.carryOn.contains) == true else { return true }
         if words.allSatisfy(Self.backchannel.contains) { return true }
         guard words.count <= 3 else { return false }
         // A short fragment needs something to act on: a real verb, noun, adjective, or number — not "can", "is", "I".
@@ -587,7 +590,8 @@ public struct CommandParser {
         if l.matches(#"^mute(?: the)?(?: sound| audio| volume| mac| computer| speakers)?$"#) { return .system(.mute, nil) }
         if l.matches(#"^unmute(?: the)?(?: sound| audio| volume| mac| computer| speakers)?$"#) { return .system(.unmute, nil) }
         if l.matches(#"^(?:pause|stop)(?: the)? (?:music|song|playback|video|track|audio|podcast)$"#) || l == "pause" { return .system(.pause, nil) }
-        if l.matches(#"^(?:play|resume|continue)(?: the)?(?: music| song| playback| video| track| audio| podcast)?$"#) { return .system(.play, nil) }
+        if l.matches(#"^(?:play|resume)(?: the)?(?: music| song| playback| video| track| audio| podcast)?$"#)
+            || l.matches(#"^continue(?: the)? (?:music|song|playback|video|track|audio|podcast)$"#) { return .system(.play, nil) }
         if l.matches(#"^(?:next|skip)(?: the)?(?: song| track| this song| this track)?$"#) || l == "skip this" { return .system(.nextTrack, nil) }
         if l.matches(#"^(?:previous|last|go back a)(?: song| track)$"#) { return .system(.previousTrack, nil) }
         if l.matches(#"^lock(?: the| my)?(?: screen| mac| computer| laptop)?$"#) { return .system(.lockScreen, nil) }

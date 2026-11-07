@@ -217,6 +217,7 @@ public enum SpeechIntent: Equatable {
         }
 
         // 9. No dictation open: what can only be for Hark is for Hark.
+        if CommandParser.carryOn.contains(core) { return .request }  // "continue" with no dictation open is never text
         if isHarkAction(core, ctx) || isMacWork(core, ctx) || isQuestionForHark(l) || isAppOperation(core, dictating: false) { return .request }
         if ctx.kind == .cell, l.matches(#"\b(?:rows?|columns?|cells?|sheets?|column [a-z]|row \d+|cell [a-z]+\d+)\b"#) { return .request }
         if isImperative(core), isRequestVerb(core), core.split(separator: " ").count >= 4, !toReader(core) { return .request }
