@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import Foundation
 import HarkCore
 
@@ -10,6 +11,7 @@ import HarkCore
 //   harkctl run "open chrome and search for ramen"
 //   harkctl agent "what's on my screen" [--dry] [--model=sonnet]
 //   harkctl screen                     # what Hark sees in the front window
+//   harkctl screenwords "words typed"  # the screen's names and terms, as the writing pass gets them
 
 Log.echoToConsole = true
 let args = Array(CommandLine.arguments.dropFirst())
@@ -134,6 +136,29 @@ case "screen":
     let snapshot = await Task { @MainActor in await AX.snapshot(browser: Browser()) }.value
     print("accessibility trusted: \(AX.isTrusted())")
     print(snapshot.describe())
+
+case "screenwords":
+    // What the writing pass would get about the front window, with `text` as the words just typed.
+    print("screen recording: \(ScreenText.hasPermission)")
+    let started = Date()
+    let context = await Task { @MainActor () -> String? in
+        let words = ScreenWords()
+        words.refresh()
+        return await words.context(newest: text, typed: "", wait: 8)
+    }.value
+    print(String(format: "in %.2fs", Date().timeIntervalSince(started)))
+    if rest.contains("--timing"), let app = NSWorkspace.shared.frontmostApplication {
+        // Without Accessibility (a terminal): just how long reading the front window takes, and how much it finds.
+        for pass in 1...3 {
+            let t = Date()
+            let lines = (try? await ScreenText.recognize(app: app.processIdentifier, area: CGDisplayBounds(CGMainDisplayID()), languageCorrection: false)) ?? []
+            let read = Date().timeIntervalSince(t)
+            let terms = await MainActor.run { ScreenWords.terms(in: lines.map(\.text)) { NSSpellChecker.shared.checkSpelling(of: $0.lowercased(), startingAt: 0).location == NSNotFound } }
+            print(String(format: "pass %d: read %d lines in %.2fs, %d terms in %.3fs", pass, lines.count, read, terms.count, Date().timeIntervalSince(t) - read))
+        }
+    } else {
+        print(context ?? "(nothing)")
+    }
 
 default:
     print("unknown command \(verb)")

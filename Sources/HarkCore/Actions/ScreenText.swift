@@ -56,7 +56,7 @@ public enum ScreenText {
         return try await recognize(crop, bounds: visible, fast: fast)
     }
 
-    private static func recognize(_ image: CGImage, bounds: CGRect, fast: Bool) async throws -> [OCRLine] {
+    private static func recognize(_ image: CGImage, bounds: CGRect, fast: Bool, languageCorrection: Bool? = nil) async throws -> [OCRLine] {
         return try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
                 if let error { continuation.resume(throwing: error); return }
@@ -72,7 +72,7 @@ public enum ScreenText {
                 continuation.resume(returning: lines)
             }
             request.recognitionLevel = fast ? .fast : .accurate
-            request.usesLanguageCorrection = !fast
+            request.usesLanguageCorrection = languageCorrection ?? !fast
             do { try VNImageRequestHandler(cgImage: image).perform([request]) } catch { continuation.resume(throwing: error) }
         }
     }
@@ -96,8 +96,9 @@ public enum ScreenText {
     }
 
     /// Text in one app's window inside `area`, even while the window is behind others: ScreenCaptureKit captures
-    /// the window itself, not what's on top of it.
-    public static func recognize(app pid: pid_t, area: CGRect) async throws -> [OCRLine] {
+    /// the window itself, not what's on top of it. Without language correction, names and identifiers are read as they
+    /// are instead of as the nearest dictionary word.
+    public static func recognize(app pid: pid_t, area: CGRect, languageCorrection: Bool = true) async throws -> [OCRLine] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         let candidates = content.windows.filter { $0.owningApplication?.processID == pid && $0.frame.intersects(area) && $0.frame.width > 100 }
         guard let window = candidates.max(by: { $0.frame.intersection(area).width * $0.frame.intersection(area).height
@@ -113,7 +114,7 @@ public enum ScreenText {
         let pixels = CGRect(x: (visible.minX - window.frame.minX) * sx, y: (visible.minY - window.frame.minY) * sy,
                             width: visible.width * sx, height: visible.height * sy).integral
         guard let crop = image.cropping(to: pixels) else { return [] }
-        return try await recognize(crop, bounds: visible, fast: false)
+        return try await recognize(crop, bounds: visible, fast: false, languageCorrection: languageCorrection)
     }
 
     /// Clicks the on-screen text that best matches `target`.

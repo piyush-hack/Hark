@@ -33,11 +33,14 @@ public enum EditorBrain {
     - "cut" and "copy" must use the cut/copy ops (they fill the clipboard, so a later paste works); "remove"/"delete" use delete.
     - The quoted "text" IS exactly what gets selected, deleted, or cut: quote just that (one word → that word), exactly as it appears in [Text]. If it appears more than once, add "occurrence" (the nearest to the caret is the default). Never invent text that isn't there.
     - Clean speech when inserting: drop uh/um, fix capitalization and punctuation, keep their words.
+    - [On screen] and [Sounds like], when present, are the names and terms around the field (see Writing session below): words inserted that sound like one of them are written the way the screen does.
     - Noise or nothing meaningful: {"ops":[]}.
 
     Writing session: with [Heard], they're dictating and Hark has already typed their words. [Before] is the text before this session (context only). [Written] has been checked already; [Just typed] follows it: Hark's typing of the newest speech, with spoken punctuation already applied. [Heard] is that speech, raw speech-to-text, in order.
     Reply ONLY {"text":"…"}: what [Written] + [Just typed] should become.
     - Fix what speech recognition got wrong in [Just typed], using the context: misheard words and names, a word said and then spelled out (write it once, as spelled: "Shawn, S E A N" → "Sean"), self-corrections ("ninety, no, sixty" → "sixty"), punctuation and capitals, joins between phrases ("the meeting. went well" → "the meeting went well").
+    - [On screen], when present, is what's in the window around the field: its names and terms, and the lines nearest the field. They're usually writing about it, and speech recognition doesn't know those words: it writes something that sounds like them, often a real word one sound off. Words in [Just typed] that sound like a term or phrase on screen are that term when it fits there — write it as the screen does ("Waka template" with WABA on screen → "WABA template"; "fluid audio" with FluidAudio → "FluidAudio"; "update the bowl of materials" with "Bill of materials" on screen → "update the bill of materials"). Words that already make sense and don't echo anything on screen stay as said. Never add anything from the screen that wasn't said.
+    - [Sounds like], when present, pairs words in [Just typed] with words on screen that sound almost the same. Each is a likely mishearing: write the screen's version when that's what they meant there; keep theirs when it fits better as said.
     - If [Heard] has an instruction about the text ("put that in brackets", "scratch that", "I meant Friday", "it's spelled H A R K"), carry it out — it may change [Written]. Brackets are round ( ) unless they say square.
     - Otherwise leave [Written] exactly as it is, and never drop a phrase: keep their words; don't reword, add, summarise, or answer anything.
     """
@@ -198,6 +201,18 @@ public actor LiveClaude {
             start(binary)
         }
         return reply
+    }
+
+    /// Adds to the request in flight: Claude Code reads it at the model's next step, inside that request (one result).
+    /// It isn't a request of its own, so it doesn't count a turn or replace `lastRequest`. If Claude Code finished the
+    /// request just before this line arrives, it becomes a request of its own whose answer is taken as the next `ask`'s.
+    /// That window is milliseconds and accepted: don't widen the `waiting` check to "close" it.
+    public func add(content: [[String: Any]]) -> Bool {
+        guard waiting != nil, let input else { return false }
+        let line = ["type": "user", "message": ["role": "user", "content": content]] as [String: Any]
+        guard let data = try? JSONSerialization.data(withJSONObject: line) else { return false }
+        input.write(data + Data("\n".utf8))
+        return true
     }
 
     /// Has Claude Code summarize a conversation that's grown past `tokens`. A request sent meanwhile waits its turn.

@@ -60,10 +60,17 @@ enum Snapshot {
                                              reply: (1...14).map { "Paragraph \($0): this answer is long on purpose, so the island has to scroll instead of cutting the text off with an ellipsis." }.joined(separator: "\n\n")) }),
             ("confirm", { engine.preview(phase: .idle, transcript: "Delete the build folder",
                                          confirmation: "Run this command? rm -rf ./build") }),
+            ("speaking", { engine.preview(phase: .listening, transcript: "Take the variables in that PDF, take the values of those variables",
+                                          liveWords: "and then generate a new PDF and upload it to S3", level: 0.6) }),
             ("dictation", { engine.preview(phase: .listening, mode: .dictation, transcript: "Hey Priya, running ten minutes late — start without me.", level: 0.5) }),
         ]
         let minimized: [(String, () -> Void)] = [
             ("minimized", { engine.preview(phase: .thinking, transcript: "Apply to five jobs") }),
+            ("minimized-speaking", { engine.preview(phase: .listening, transcript: "Take the variables in that PDF, take the values of those variables",
+                                                    liveWords: "and then generate a new PDF and upload it to S3", level: 0.6) }),
+            ("minimized-speaking-while-working", { engine.preview(phase: .working, transcript: "Apply to five jobs",
+                                                                  liveWords: "only ones in Noida or Gurgaon",
+                                                                  steps: [Step(title: "Open LinkedIn Jobs", status: .running)]) }),
             ("minimized-working", { engine.preview(phase: .working, transcript: "Apply to five jobs",
                                                    steps: [Step(title: "Open LinkedIn Jobs", status: .done),
                                                            Step(title: "Click “Easy Apply” on the Product Designer role", status: .running)]) }),

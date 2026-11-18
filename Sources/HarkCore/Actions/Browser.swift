@@ -12,7 +12,7 @@ public final class Browser {
     nonisolated public static let all = chromium + ["Safari", "Firefox", "Zen Browser", "Orion"]
 
     public var preferred: () -> String? = { nil }
-    public var keyboardGate: () async -> Void = {}
+    public var keyboardGate: () async throws -> Void = {}
     /// The tab the last `currentTab()` saw, for decisions that can't wait on the browser.
     public private(set) var lastTab: BrowserTab?
 
@@ -121,7 +121,7 @@ public final class Browser {
                 try await AppleScript.run("tell application \(q) to tell front window to set active tab index to ((active tab index) mod (count of tabs)) + 1")
             case .previousTab:
                 try await AppleScript.run("tell application \(q) to tell front window to set active tab index to (((active tab index) - 2 + (count of tabs)) mod (count of tabs)) + 1")
-            case .reopenTab: await keyboardGate(); try Keyboard.press(KeyCombo(key: "t", command: true, shift: true))
+            case .reopenTab: try await keyboardGate(); try Keyboard.press(KeyCombo(key: "t", command: true, shift: true))
             }
             return
         }
@@ -139,7 +139,7 @@ public final class Browser {
     }
 
     private func keys(for action: BrowserAction) async throws {
-        await keyboardGate()
+        try await keyboardGate()
         let combo: KeyCombo
         switch action {
         case .newTab: combo = KeyCombo(key: "t", command: true)

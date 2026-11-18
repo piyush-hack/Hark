@@ -94,6 +94,10 @@ public actor Segmenter {
     /// Frames of quiet since the last voice, so the engine can tell "finished a thought" from "between words".
     private var quietFrames = 0
     public var quietSeconds: Double { Double(quietFrames * Self.frame) / 16_000 }
+    /// A phrase is being spoken right now (short pauses inside it included).
+    public var speaking: Bool { inSpeech }
+    /// What's been heard of the phrase being spoken, with the moment before it.
+    public var phraseSoFar: [Float] { inSpeech ? audio : [] }
 
     static let frame = 320            // 20 ms at 16 kHz
     static let minSpeechFrames = 10   // 200 ms of voice before a pause counts

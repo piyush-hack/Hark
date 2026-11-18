@@ -391,6 +391,41 @@ final class NoiseTests: XCTestCase {
         }
     }
 
+    func testASentenceEndingOnAKeyPressWaitsForTheRest() {
+        let parser = CommandParser(apps: ["Google Chrome"])
+        let plan = parser.plan
+        // The 17:20 dictation: "…upload that to S3 and return" pressed Return, then "the PDF link newly generated" came.
+        let sentence = "generate a new PDF, upload that to S3 and return"
+        let (ready, remainder) = parser.streamingPlan(sentence)
+        XCTAssertTrue(ready.isEmpty, "\(ready)")
+        XCTAssertEqual(remainder, sentence)
+        let whole = HarkEngine.joinPhrases(remainder, "the PDF link newly generated")
+        XCTAssertEqual(whole, "generate a new PDF, upload that to S3 and return the PDF link newly generated")
+        XCTAssertEqual(plan(whole).count, 1)
+        guard case .agent = plan(whole).first else { return XCTFail("\(plan(whole))") }
+        // The recognizer adds full stops: "…and return." still waits, and joins what comes next as one sentence.
+        XCTAssertTrue(CommandParser.endsMidThought("Upload that to S3 and return."))
+        XCTAssertEqual(HarkEngine.joinPhrases("Upload that to S3 and return.", "The PDF link newly generated."),
+                       "Upload that to S3 and return The PDF link newly generated.")
+        // A key on its own is meant: it still goes at once.
+        for alone in ["press enter", "return"] {
+            let (now, rest) = parser.streamingPlan(alone)
+            XCTAssertEqual(rest, "", alone)
+            guard case .pressKeys = now.first else { return XCTFail("\(alone): \(now)") }
+        }
+    }
+
+    func testRequestSentencesStayOneRequest() {
+        let parser = CommandParser(apps: ["Spotify"])
+        // Still talking: nothing of it runs yet.
+        let (waiting, rest) = parser.streamingPlan("Take the PDS. Take the variables in that PDF, take the values of that")
+        XCTAssertTrue(waiting.isEmpty, "\(waiting)")
+        XCTAssertEqual(rest, "Take the PDS, Take the variables in that PDF, take the values of that")
+        // Moved on to an instant command: the request before it is complete, as one.
+        let (ready, _) = parser.streamingPlan("Summarize this page. Then email it to Priya. Open Spotify")
+        XCTAssertEqual(ready.filter(\.isAgent).count, 1, "\(ready)")
+    }
+
     func testCarryingOnReachesClaudeNotTheMusic() {
         let plan = CommandParser(apps: ["Spotify"]).plan
         for heard in ["Continue", "continue.", "Proceed"] {

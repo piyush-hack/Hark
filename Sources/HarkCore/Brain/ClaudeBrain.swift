@@ -139,6 +139,18 @@ public final class ClaudeBrain {
         await currentSession().prewarm()
     }
 
+    /// The user said more while Claude works on their request. It goes into that same request: Claude Code reads it at
+    /// the model's next step. False when no request is running (it had just finished): then it's a request of its own.
+    public func add(_ text: String, whole: String) async -> Bool {
+        guard let session else { return false }
+        let note = """
+        [Hark] The user said more while you work: “\(text)”. Everything they've said for this: “\(whole)”. If it adds to \
+        or changes what they want, adjust, and undo anything that's now wrong if you can. If it's a separate request, do \
+        it after this one. If it isn't meant for you, ignore it.
+        """
+        return await session.add(content: [["type": "text", "text": note]])
+    }
+
     /// A short follow-up in the same session (Hark asking Claude to save what it just learned).
     public func followUp(_ text: String) async throws {
         // Same session that did the task, never a fresh one — it has to remember what just happened.

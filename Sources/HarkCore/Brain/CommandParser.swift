@@ -43,16 +43,22 @@ public struct CommandParser {
     /// Streaming pass while the user is still talking: commands safe to run now, plus text to hold back.
     public func streamingPlan(_ text: String) -> (ready: [Command], remainder: String) {
         let clauses = parse(text)
+        // A sentence ending on a key press may not be finished: "…upload it to S3 and return" can go on "the link". A key
+        // press can't be taken back, so the whole sentence waits for the pause and joins what you say next.
+        if clauses.count > 1, let last = clauses.last?.command, case .pressKeys = last { return ([], text) }
         var ready: [Command] = []
         var index = 0
         while index < clauses.count {
             let isLast = index == clauses.count - 1
             guard let command = clauses[index].command else {
-                // Not an instant command. If you've already moved on to the next command, it's complete:
-                // more text to type, or a request for the brain, so it doesn't block everything after it.
-                if isLast { break }
-                ready.append(.agent(clauses[index].text))
-                index += 1
+                // Not an instant command: one request together with any request words right after it (as `plan` does),
+                // never several. If it runs to the end you may still be talking, so it waits; if an instant command
+                // follows, you've moved on and it's complete.
+                var end = index
+                while end + 1 < clauses.count, clauses[end + 1].command == nil { end += 1 }
+                if end == clauses.count - 1 { break }
+                ready.append(.agent(clauses[index...end].map(\.text).joined(separator: ", ")))
+                index = end + 1
                 continue
             }
             if isLast && command.isOpenEnded && !Self.safeToRunEarly(command) { break }
@@ -541,9 +547,10 @@ public struct CommandParser {
 
     /// A phrase cut off at "create a" / "go to the" isn't finished; wait for the rest before acting on it.
     public static func endsMidThought(_ text: String) -> Bool {
-        let last = text.lowercased().trimmingCharacters(in: .whitespaces).split(separator: " ").last.map(String.init) ?? ""
+        // The recognizer punctuates ("…and return."): the word counts, not its full stop.
+        let last = text.lowercased().trimmingCharacters(in: .whitespaces.union(.punctuationCharacters)).split(separator: " ").last.map(String.init) ?? ""
         return ["a", "an", "the", "to", "into", "onto", "in", "on", "of", "for", "with", "at", "from", "my", "your", "our",
-                "this", "that", "and", "or", "go", "create", "make", "add", "insert", "open", "search", "type"].contains(last)
+                "this", "that", "and", "or", "go", "create", "make", "add", "insert", "open", "search", "type", "return", "enter"].contains(last)
     }
 
     private func parseBrowser(_ l: String) -> Command? {

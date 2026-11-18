@@ -87,7 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 // Opening a URL brings Hark forward; hand focus back so keystrokes land where the user was.
                 lastExternalApp?.activate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.engine.handle(text: text) }
+                // speech=1: as if it were said (continuations, held fragments), for testing those paths.
+                let spoken = items.first(where: { $0.name == "speech" })?.value == "1"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    if spoken { self?.engine.hear(text) } else { self?.engine.handle(text: text) }
+                }
             case "edit":
                 // hark://edit?key=…&ops=[…] — raw edit steps, logging the field after each (to learn how an editor behaves).
                 guard key == engine.settings.urlKey, let ops = items.first(where: { $0.name == "ops" })?.value else { continue }
@@ -99,6 +103,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 } else {
                     updater.checkNow()
                 }
+            case "simulate":
+                // hark://simulate?key=…&file=…[&live=0] — a recording through the real listening path at speaking speed,
+                // nothing acted on (dry run): live words and how long each phrase takes to be heard, in hark.log.
+                guard key == engine.settings.urlKey, let file = items.first(where: { $0.name == "file" })?.value,
+                      let samples = try? AudioFile.load(URL(fileURLWithPath: file)) else { continue }
+                let live = items.first(where: { $0.name == "live" })?.value != "0"
+                Task { _ = await engine.simulate(samples, realtime: true, liveWordsOn: live) }
             case "bench":
                 guard key == engine.settings.urlKey, let dir = items.first(where: { $0.name == "dir" })?.value else { continue }
                 Task { await engine.benchmark(folder: URL(fileURLWithPath: dir)) }

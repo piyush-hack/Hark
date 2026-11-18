@@ -42,7 +42,7 @@ public enum EditError: LocalizedError {
 /// exactly and works mid-speech. Keystrokes (formatting, undo) wait until ⌥⌘ is released.
 @MainActor
 public final class TextEditor {
-    public var keyboardGate: () async -> Void = {}
+    public var keyboardGate: () async throws -> Void = {}
 
     public init() {}
 
@@ -213,7 +213,7 @@ public final class TextEditor {
         case "delete", "remove", "erase":
             if op["text"] == nil && op["from"] == nil {
                 // The selection: the Delete key works in every field, readable or not.
-                await keyboardGate()
+                try await keyboardGate()
                 try Keyboard.press(KeyCombo(key: "delete"))
                 return "Delete"
             }
@@ -233,7 +233,7 @@ public final class TextEditor {
 
         case "cut", "copy":
             if op["text"] == nil && op["from"] == nil {
-                await keyboardGate()
+                try await keyboardGate()
                 try Keyboard.press(KeyCombo(key: name == "cut" ? "x" : "c", command: true))
                 return name == "cut" ? "Cut" : "Copy"
             }
@@ -258,7 +258,7 @@ public final class TextEditor {
         case "format", "style":
             let style = (op["style"] as? String ?? "").lowercased()
             if let combo = Self.shortcut(for: style, app: app, url: url) {
-                await keyboardGate()
+                try await keyboardGate()
                 try Keyboard.press(combo)
                 return style.capitalized
             }
@@ -268,7 +268,7 @@ public final class TextEditor {
                 var line = ns.lineRange(for: NSRange(location: field.selection.location, length: 0))
                 if ns.substring(with: line).hasSuffix("\n") { line.length -= 1 }
                 guard line.length > 0, setSelection(field.element, line) else { throw EditError.needsScreen("This field won't let me select the line.") }
-                await keyboardGate()
+                try await keyboardGate()
                 try Keyboard.press(KeyCombo(key: "b", command: true))
                 for _ in 0..<steps { try Keyboard.press(KeyCombo(key: "=", command: true)) }
                 _ = setSelection(field.element, NSRange(location: line.location + line.length, length: 0))
@@ -289,12 +289,12 @@ public final class TextEditor {
 
         case "key", "keys", "press":
             guard let combo = KeyCombo(spoken: op["keys"] as? String ?? "") else { return "" }
-            await keyboardGate()
+            try await keyboardGate()
             try Keyboard.press(combo)
             return "Press \(combo)"
 
         case "undo":
-            await keyboardGate()
+            try await keyboardGate()
             try Keyboard.press(KeyCombo(key: "z", command: true))
             return "Undo"
 
@@ -315,7 +315,7 @@ public final class TextEditor {
         let before = field.flatMap { web && Self.caretNearEnd($0) ? $0.text.last : Self.character(before: $0) }
         let typed = field == nil ? text : AX.spaced(text, before: before)
         if !web, let field, replaceSelection(field, with: typed) { return typed }
-        await keyboardGate()
+        try await keyboardGate()
         guard web, let field else {
             try await Keyboard.type(typed)
             return typed
@@ -349,7 +349,7 @@ public final class TextEditor {
     /// changed (the selection is dropped) and this returns false.
     @discardableResult
     public func retypeBeforeCaret(_ count: Int, expecting old: String? = nil, with text: String) async throws -> Bool {
-        await keyboardGate()
+        try await keyboardGate()
         for _ in 0..<count { try Keyboard.press(KeyCombo(key: "left", shift: true), quick: true) }
         if let old, count > 0, let element = Self.capture()?.element {
             try? await Task.sleep(nanoseconds: 60_000_000)
@@ -370,7 +370,7 @@ public final class TextEditor {
 
     /// After a change that didn't take: the caret back at the end of the selection it left, the text untouched.
     public func collapseSelection() async throws {
-        await keyboardGate()
+        try await keyboardGate()
         try Keyboard.press(KeyCombo(key: "right"))
     }
 
@@ -427,10 +427,10 @@ public final class TextEditor {
             let now = Self.read(field.element)
             Log.info("Change: couldn't select \(range.location)+\(range.length) (selection now \(now.map { "\($0.selection.location)+\($0.selection.length)" } ?? "unknown"))")
             guard let now, now.selection == end else { return false }
-            await keyboardGate()
+            try await keyboardGate()
             for _ in 0..<(original as NSString).substring(with: range).count { try Keyboard.press(KeyCombo(key: "left", shift: true)) }
         }
-        await keyboardGate()
+        try await keyboardGate()
         if text.isEmpty { try Keyboard.press(KeyCombo(key: "delete")) } else { try await Keyboard.type(text) }
         let changed = await Self.waitFor(field.element) { $0.text != original } != nil || Self.read(field.element) == nil
         Log.info("Change: pasted over the range; text \(changed ? "changed" : "unchanged")")

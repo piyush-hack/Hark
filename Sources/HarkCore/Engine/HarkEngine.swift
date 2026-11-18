@@ -41,6 +41,8 @@ public final class HarkEngine: ObservableObject {
     /// Tap ⌥⌘ instead of holding: Hark keeps listening (and acting) until you tap ⌥⌘ again or say "stop listening".
     @Published public private(set) var handsFree = false
     @Published public private(set) var transcript = ""
+    /// The phrase being spoken right now, as it's said (shown dimmer after `transcript`; never acted on).
+    @Published public private(set) var liveWords = ""
     /// Mic level lives in its own object so only the orb redraws while you talk.
     public let meter = AudioLevel()
     public var level: Float { meter.value }
@@ -99,6 +101,11 @@ public final class HarkEngine: ObservableObject {
 
     private let capture = AudioCapture()
     private let segmenter = Segmenter()
+    private let live = LiveWords()
+    /// What's on screen around the field you're writing in, so the writing pass knows its names and terms.
+    private let screenWords = ScreenWords()
+    private var inPhrase = false
+    private var liveWordsOff = false
     private var audioStream: AsyncStream<[Float]>.Continuation?
     private var listenTask: Task<Void, Never>?
     private var pendingText = ""
@@ -133,7 +140,30 @@ public final class HarkEngine: ObservableObject {
     private var heardBySpeech = false
     public var isBusy: Bool { runner != nil || !queue.isEmpty || phase == .transcribing }
 
-    private var queue: [(Command, String)] = []
+    /// Commands waiting to run: the command, what was said, and the utterance it came from (speech only).
+    private var queue: [(Command, String, Int?)] = []
+    /// What you're saying in one go (phrases with short pauses, or one hold of ⌥⌘) while nothing of it has been done
+    /// yet: the next phrase may finish the sentence, and then it's planned again as a whole (`carryOn`).
+    private var utterance: Utterance?
+    private struct Utterance {
+        let id: Int
+        var phrases: [String]
+        var lastAt: Date
+        let press: Int
+        /// Something from it already happened (typed, clicked, opened): what follows is planned on its own.
+        var acted = false
+        var text: String { phrases.reduce("") { HarkEngine.joinPhrases($0, $1) } }
+    }
+    private var utterances = 0
+    private var presses = 0
+    /// The step running: which run it is, whether it has done anything yet, and the utterance it came from.
+    private var runID = UUID()
+    private var runTouched = false
+    private var runningUtterance: Int?
+    /// A run your next phrase took back: it stops before doing anything.
+    private var supersededRun: UUID?
+    /// Claude is working on something you said (not a watcher's or a typed request): more speech goes to it.
+    private var claudeServingSpeech = false
     private var runner: Task<Void, Never>?
     private var confirmation: CheckedContinuation<Bool, Never>?
     private var housekeeping: Timer?
@@ -150,13 +180,14 @@ public final class HarkEngine: ObservableObject {
             Log.info("  ↳ Use " + Self.toolDisplayName(name))
             self?.addStep("Use " + Self.toolDisplayName(name), status: .done)
         }
+        live.onWords = { [weak self] words in self?.liveWords = words }
         claudeBrain.observe = { [weak self] in
             guard let self else { return ("", []) }
             return (await self.screenSummary(), await self.screenImages())
         }
         browser.preferred = { [weak self] in self?.settings.preferredBrowser }
-        browser.keyboardGate = { [weak self] in await self?.waitForKeysReleased() }
-        textEditor.keyboardGate = { [weak self] in await self?.waitForKeysReleased() }
+        browser.keyboardGate = { [weak self] in try await self?.keysReleasedForStep() }
+        textEditor.keyboardGate = { [weak self] in try await self?.keysReleasedForStep() }
         capture.voiceProcessing = settings.noiseSuppression
         capture.onLevel = { [weak self] value in
             DispatchQueue.main.async { self?.meter.push(value) }
@@ -352,6 +383,7 @@ public final class HarkEngine: ObservableObject {
         guard phase != .listening else { return }
         hideWork?.cancel()
         isHoldingHotkey = true
+        presses += 1
         self.mode = mode
         pointAtRelease = nil
         // The writing model and Claude's session start while you talk, so they're ready when you finish the sentence.
@@ -396,11 +428,33 @@ public final class HarkEngine: ObservableObject {
 
     /// Feeds a recording through the same pipeline as the live mic (in dry-run mode) and returns
     /// when each command would have run, in seconds of audio. The key counts as held until the end.
-    public func simulate(_ samples: [Float]) async -> [(seconds: Double, title: String)] {
+    /// `realtime` feeds the audio at speaking speed (for live words and timing); `liveWordsOn: false` measures without them.
+    public func simulate(_ samples: [Float], realtime: Bool = false, liveWordsOn: Bool = true) async -> [(seconds: Double, title: String)] {
         dryRun = true
         dryRunLog = []
+        liveWordsOff = !liveWordsOn
+        // Back to acting for real afterwards, with nothing of the replay left in the turn: Hark keeps running after a
+        // hark://simulate, and what you say next mustn't come with the recording's words.
+        defer {
+            dryRun = false
+            liveWordsOff = false
+            utterance = nil
+            committedHeard = ""; pendingHeard = ""; pendingText = ""; heardThisTurn = ""; transcript = ""; liveWords = ""
+        }
+        let started = Date()
+        var updates: [(at: Double, words: String)] = []
+        let watch = $liveWords.dropFirst().sink { words in if !words.isEmpty { updates.append((Date().timeIntervalSince(started), words)) } }
+        defer {
+            watch.cancel()
+            Log.info(String(format: "SIMULATE %.1fs of audio, live words %@: %d updates%@", Double(samples.count) / 16_000,
+                            liveWordsOn ? "on" : "off", updates.count,
+                            updates.first.map { String(format: ", first at %.2fs, last “%@” at %.2fs", $0.at, updates.last!.words, updates.last!.at) } ?? ""))
+            Log.info("SIMULATE would run: " + dryRunLog.map(\.title).joined(separator: " | "))
+        }
         consumedSamples = 0
         isHoldingHotkey = true
+        presses += 1
+        utterance = nil
         mode = .command
         committedHeard = ""; pendingHeard = ""; pendingText = ""; pendingAudio = []
         typingContinues = false; earlySearch = nil; heardThisTurn = ""
@@ -412,6 +466,7 @@ public final class HarkEngine: ObservableObject {
         while index < samples.count {
             continuation?.yield(Array(samples[index..<min(index + 1_600, samples.count)]))
             index += 1_600
+            if realtime { try? await Task.sleep(nanoseconds: 100_000_000) }
         }
         isHoldingHotkey = false
         phase = .transcribing
@@ -445,6 +500,7 @@ public final class HarkEngine: ObservableObject {
     public func endListening() {
         handsFree = false
         isHoldingHotkey = false
+        live.end()
         guard audioStream != nil else { return }
         pointAtRelease = RegionPicker.mouse
         capture.stop()
@@ -462,7 +518,9 @@ public final class HarkEngine: ObservableObject {
             if Task.isCancelled { return }
             consumedSamples += samples.count
             if settings.keepRecordings, holdAudio.count < 16_000 * 60 { holdAudio.append(contentsOf: samples) }
-            for segment in await segmenter.append(samples) {
+            let segments = await segmenter.append(samples)
+            await followLiveWords(samples, phraseEnded: !segments.isEmpty)
+            for segment in segments {
                 await transcribePhrase(segment)
             }
             let quiet = await segmenter.quietSeconds
@@ -474,12 +532,31 @@ public final class HarkEngine: ObservableObject {
             // Hands-free stays on until ⌥⌘ is tapped again, however long it's quiet (voice learning: 40 s at most).
             if learningVoice, Date().timeIntervalSince(learningStarted) > 40 { endListening() }
         }
+        live.end()
         if Task.isCancelled { return }
         let rest = await segmenter.flush()
         _ = try? await loader.value
         if !rest.isEmpty || !pendingAudio.isEmpty { await transcribePhrase(rest) }
         saveRecording()
         ingestFinal()
+    }
+
+    /// Live words for the phrase being spoken. They stay up until that phrase's real text replaces them.
+    private func followLiveWords(_ samples: [Float], phraseEnded: Bool) async {
+        let speaking = await segmenter.speaking
+        if phraseEnded || !speaking { live.end(); inPhrase = false }
+        // Speech starting in a text field: read the screen around it now, so it's ready when the words are.
+        if speaking, !inPhrase {
+            inPhrase = true
+            if TextEditor.isEditing() { screenWords.refresh() }
+        }
+        // In hands-free the room talks too: other people's words aren't shown, so only while you hold ⌥⌘.
+        guard speaking, !liveWordsOff, isHoldingHotkey || !handsFree || !settings.voiceMatch, !learningVoice, confirmation == nil else { return }
+        if live.isActive {
+            live.append(samples)
+        } else {
+            live.begin(with: await segmenter.phraseSoFar, locale: settings.speechLocale, hints: recognitionHints)
+        }
     }
 
     /// Opt-in tuning data: the whole hold as a WAV plus what Hark heard, newest 20 kept.
@@ -510,6 +587,8 @@ public final class HarkEngine: ObservableObject {
     /// Transcribes a phrase — together with any still-pending audio, so "Type in" + "hello, how are you"
     /// is heard as one sentence instead of two context-free fragments.
     private func transcribePhrase(_ segment: [Float]) async {
+        // The phrase's real text replaces its live words (cleared in the same update, so nothing flickers).
+        defer { liveWords = "" }
         if learningVoice { return await learnVoiceSample(segment) }
         // Hands-free hears the whole room: only your voice gets through (checked before transcribing, ~30 ms).
         if settings.voiceMatch, handsFree || listeningForAnswer, !isHoldingHotkey, let score = await VoiceID.shared.match(segment) {
@@ -524,12 +603,14 @@ public final class HarkEngine: ObservableObject {
         let audio = combined ? pendingAudio + segment : segment
         guard !audio.isEmpty else { return }
         do {
+            let started = Date()
             let text = try await recognize(audio)
             speechModel = .ready
             guard !text.isEmpty else { return }
             if settings.speechEngine != "apple" {
                 let confidence = await Transcriber.shared.lastConfidence
-                Log.info(String(format: "Heard (confidence %.2f, %.1fs): %@", confidence, Double(audio.count) / 16_000, text))
+                Log.info(String(format: "Heard (confidence %.2f, %.1fs, in %.2fs): %@", confidence, Double(audio.count) / 16_000,
+                                Date().timeIntervalSince(started), text))
             }
             // Holding ⌥⌘ means it's you: every real phrase teaches Hark your voice a little more. So does the first
             // thing said right after tapping ⌥⌘ for hands-free, while Hark doesn't know your voice yet.
@@ -596,7 +677,7 @@ public final class HarkEngine: ObservableObject {
 
     /// Words that help recognition: your vocabulary plus well-known sites and the apps you have.
     var recognitionHints: [String] {
-        settings.vocabulary + SpokenText.knownSites + ["Claude", "Claude Code", "Gemini", "ChatGPT", "Gmail", "Chrome", "Notes", "Slack", "WhatsApp"]
+        settings.vocabulary + screenWords.hints + SpokenText.knownSites + ["Claude", "Claude Code", "Gemini", "ChatGPT", "Gmail", "Chrome", "Notes", "Slack", "WhatsApp"]
     }
 
     func recognize(_ audio: [Float]) async throws -> String {
@@ -635,6 +716,7 @@ public final class HarkEngine: ObservableObject {
     private func ingest(_ raw: String, replacingPending: Bool = false, audio: [Float] = [], segment: [Float] = []) {
         var text = Vocabulary.correct(SpokenText.normalize(raw, known: settings.vocabulary), terms: settings.vocabulary)
         if text != raw { Log.info("Heard “\(raw)” → “\(text)”") }
+        let spoken = text
         // A sentence start held from just before ("Even though I" … "it misses words") belongs to this phrase — unless
         // it's old, or this phrase is a command on its own (then the fragment was someone else's).
         if let held = heldFragment, mode == .command {
@@ -685,6 +767,11 @@ public final class HarkEngine: ObservableObject {
             if !rest.isEmpty { ingestRest(rest) }
             return
         }
+        // Still talking about what Hark already started on: it goes with it.
+        if heardBySpeech {
+            guard let whole = carryOn(spoken, routed: text, replacing: replacingPending, seconds: Double(audio.count) / 16_000) else { return }
+            text = whole
+        }
         // A text field has focus: what the phrase is for is decided before anything is typed — words, punctuation,
         // keys, an edit, a stop, or a request for Hark (which goes on to the commands below).
         if pendingText.isEmpty, let ctx = fieldContext(), routeInField(text, ctx) { return }
@@ -714,6 +801,128 @@ public final class HarkEngine: ObservableObject {
         else if let last = ready.last, case .searchHere(let query) = last, remainder.isEmpty { earlySearch = (query, .google) }
         else if !ready.isEmpty { earlySearch = nil }
         enqueue(ready, heard: text)
+    }
+
+    /// Where a phrase goes when you're still talking about what Hark started on. Returns the text to plan, or nil when
+    /// it was handled.
+    /// - Claude is working on something you said: the phrase goes into that same request (Claude reads it at its next
+    ///   step and decides whether it changes the job), unless it's a stop, an instant command, or noise.
+    /// - Steps from this utterance haven't done anything yet (queued, or waiting for you to let go of ⌥⌘): they're
+    ///   taken back and the whole sentence is planned again, so "…upload it to S3 and return" + "the link" is one
+    ///   request, not an upload and a press of Return.
+    /// `spoken` is just this phrase; `routed` may carry a held fragment in front of it.
+    private func carryOn(_ spoken: String, routed: String, replacing: Bool, seconds: Double) -> String? {
+        guard mode == .command else { return routed }
+        let now = Date()
+        let commands = parser.plan(spoken)
+        if claudeServingSpeech, !commands.isEmpty, commands.allSatisfy(\.isAgent), !commands.contains(.stop),
+           !SpeechIntent.isStop(SpeechIntent.lower(spoken)), !CommandParser.isNoise(spoken) {
+            tellClaude(spoken)
+            return nil
+        }
+        let continues = utterance.map { open in
+            !open.acted && ((open.press == presses && isHoldingHotkey) || now.timeIntervalSince(open.lastAt) - seconds < 2.0)
+        } ?? false
+        guard continues, var open = utterance else {
+            utterances += 1
+            utterance = Utterance(id: utterances, phrases: [spoken], lastAt: now, press: presses)
+            return routed
+        }
+        if replacing, !open.phrases.isEmpty { open.phrases.removeLast() }  // heard again, with this phrase
+        open.phrases.append(spoken)
+        open.lastAt = now
+        utterance = open
+        let queued = queue.filter { $0.2 == open.id }
+        let runningOpen = runningUtterance == open.id && !runTouched && running.map(Self.waitsToAct) == true
+        guard !queued.isEmpty || runningOpen else { return routed }
+        // Only an unfinished request takes the rest of the sentence. Words being typed and keys you asked for stay as they
+        // are: "type hello" + "and open Chrome" is two things, and put together it would type the command.
+        guard queued.allSatisfy({ takesMore($0.0) }), !runningOpen || running.map(takesMore) == true else { return routed }
+        // Take back what hadn't happened yet, and plan the whole sentence again.
+        queue.removeAll { $0.2 == open.id }
+        for (command, _, _) in queued {
+            if let i = steps.lastIndex(where: { $0.title == command.title && $0.status == .pending }) { steps.remove(at: i) }
+        }
+        if runningOpen { supersededRun = runID }
+        pendingText = ""
+        pendingAudio = []
+        heldFragment = nil
+        let whole = open.text
+        mergedSentence = whole
+        Log.info("You weren't finished: planning “\(whole)” as a whole (\(queued.count + (runningOpen ? 1 : 0)) step(s) taken back)")
+        return whole
+    }
+
+    /// A step the rest of a sentence can still change: a request for Hark or Claude, or an edit the writing model plans.
+    private func takesMore(_ command: Command) -> Bool {
+        switch command {
+        case .agent: return true
+        case .edit(let said):
+            guard let ctx = fieldContext() else { return true }
+            switch SpeechIntent.classify(said, in: ctx, allowHold: false) {
+            case .askFirst, .edit, .request: return true
+            default: return false
+            }
+        default: return false
+        }
+    }
+
+    /// The last sentence put back together from an unfinished request. In a text field it's never typed as it stands
+    /// (a request inside it would be typed too): the writing model plans it, with the whole sentence to go on.
+    private var mergedSentence: String?
+    private var modelPlans: Set<String> = []
+
+    /// More for the request Claude is working on: it goes into that request, not after it.
+    private func tellClaude(_ text: String) {
+        commitHeard()
+        addStep("+ “\(TextEditor.short(text))”", status: .done)
+        Log.info("Added to what Claude is doing: “\(text)”")
+        let whole = heardThisTurn
+        Task { [weak self] in
+            guard let self else { return }
+            if await !self.claudeBrain.add(text, whole: whole) {
+                // It had just finished: then it's a request of its own.
+                Log.info("Claude had finished; “\(text)” runs on its own")
+                self.enqueue(self.parser.plan(text), heard: text)
+            }
+        }
+    }
+
+    /// Steps that wait for ⌥⌘ to be let go before they touch anything, so a phrase that follows can still take them back.
+    nonisolated static func waitsToAct(_ command: Command) -> Bool {
+        switch command {
+        case .edit, .typeText, .pressKeys: return true
+        default: return false
+        }
+    }
+
+    /// The step running is about to change something. If your next phrase took it back, it stops here, untouched.
+    private func aboutToAct() throws {
+        if let superseded = supersededRun, superseded == runID { throw Superseded() }
+        runTouched = true
+        if let id = runningUtterance, utterance?.id == id { utterance?.acted = true }
+    }
+
+    /// Before a step uses the keyboard: waits for ⌥⌘ to be let go, then checks it's still wanted.
+    func keysReleasedForStep() async throws {
+        await waitForKeysReleased()
+        try aboutToAct()
+    }
+
+    /// A step that the rest of your sentence replaced.
+    struct Superseded: Error {}
+
+    /// hark://run with speech=1: as if you'd said it, through the paths only speech takes (for testing them).
+    public func hear(_ text: String) {
+        turnFromUser = true
+        heardBySpeech = true
+        mode = .command
+        ingest(text)
+        // No microphone to notice the pause: what's still waiting runs a moment later, as after a real one.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, !self.pendingText.isEmpty else { return }
+            self.flushPending()
+        }
     }
 
     /// Logs the request that just finished and clears the island for the next one; listening carries on.
@@ -748,8 +957,11 @@ public final class HarkEngine: ObservableObject {
     nonisolated public static func joinPhrases(_ earlier: String, _ next: String) -> String {
         guard !earlier.isEmpty else { return next }
         let ended = earlier.last.map { ".,!?;:".contains($0) } ?? false
-        // "create a" … "new paragraph" is one thought; don't put a sentence break inside it.
-        if !ended, CommandParser.endsMidThought(earlier) { return earlier + " " + next }
+        // "create a" … "new paragraph", "…and return." … "the link": one thought, so no sentence break inside it (the
+        // recognizer's own full stop included).
+        if CommandParser.endsMidThought(earlier) {
+            return earlier.trimmingCharacters(in: CharacterSet(charactersIn: ".!?").union(.whitespaces)) + " " + next
+        }
         return earlier + (ended ? " " : ". ") + next
     }
 
@@ -773,7 +985,16 @@ public final class HarkEngine: ObservableObject {
 
     /// Acts on speech heard in a text field. True when it's handled; false for a request, which the commands take.
     private func routeInField(_ text: String, _ ctx: SpeechIntent.Context, allowHold: Bool = true) -> Bool {
-        let intent = SpeechIntent.classify(text, in: ctx, allowHold: allowHold)
+        var intent = SpeechIntent.classify(text, in: ctx, allowHold: allowHold)
+        if text == mergedSentence {
+            mergedSentence = nil
+            switch intent {
+            case .words, .punctuation, .hold:
+                intent = .askFirst
+                modelPlans.insert(text)
+            default: break
+            }
+        }
         Log.info("In a \(ctx.kind.rawValue) field\(ctx.dictating ? " (dictating)" : ""): “\(text)” → \(intent.name)")
         switch intent {
         case .request:
@@ -898,6 +1119,7 @@ public final class HarkEngine: ObservableObject {
     /// Typed or automation-triggered requests take the same path as speech.
     public func handle(text: String) {
         Task { await EditorBrain.shared.prewarm() }
+        utterance = nil
         turnFromUser = true
         heardBySpeech = false
         heardThisTurn = text
@@ -954,8 +1176,9 @@ public final class HarkEngine: ObservableObject {
             return true
         }
         guard !fresh.isEmpty else { return }
+        let spokenIn = heardBySpeech && mode == .command && utterance?.acted == false ? utterance?.id : nil
         for command in fresh {
-            queue.append((command, heard))
+            queue.append((command, heard, spokenIn))
             if command.isAgent { continue }
             steps.append(Step(title: command.title, status: .pending))
         }
@@ -968,17 +1191,29 @@ public final class HarkEngine: ObservableObject {
 
     private func drain() async {
         while !queue.isEmpty {
-            let (command, heard) = queue.removeFirst()
+            let (command, heard, spokenIn) = queue.removeFirst()
             if phase != .listening { phase = command.isAgent ? .thinking : .working }
             let step = steps.first { $0.title == command.title && $0.status == .pending }?.id
             mark(step, .running)
+            running = command
+            defer { running = nil }
+            runID = UUID()
+            runTouched = false
+            runningUtterance = spokenIn
+            // Opening, clicking, Claude: these act at once. Keyboard steps act when ⌥⌘ is let go (`aboutToAct`).
+            if !Self.waitsToAct(command), let id = spokenIn, utterance?.id == id { utterance?.acted = true }
             if dryRun {
+                // Like the real thing: a keyboard step waits for ⌥⌘, so the rest of the sentence can still take it back.
+                if Self.waitsToAct(command) {
+                    do { try await keysReleasedForStep() } catch {
+                        Log.info("Dry run: “\(command.title)” taken back for the whole sentence")
+                        continue
+                    }
+                }
                 dryRunLog.append((Double(consumedSamples) / 16_000, command.title))
                 mark(step, .done)
                 continue
             }
-            running = command
-            defer { running = nil }
             // Anything other than writing ends writing mode.
             switch command {
             case .edit, .typeText, .pressKeys, .scroll, .wait: break
@@ -993,6 +1228,9 @@ public final class HarkEngine: ObservableObject {
                 if !command.isAgent { claudeBrain.note(heard, did: command.title) }
             } catch is CancellationError {
                 break
+            } catch is Superseded {
+                Log.info("Taken back, the whole sentence goes instead: \(command.title)")
+                if let step { steps.removeAll { $0.id == step } }
             } catch {
                 mark(step, .failed)
                 Log.error("Failed: \(command.title) — \(error.localizedDescription)")
@@ -1062,6 +1300,7 @@ public final class HarkEngine: ObservableObject {
     /// Cancels whatever Hark is doing (the island's Stop button, "stop", or ⎋).
     /// Listening (held or hands-free) carries on: "stop" stops actions, not the microphone.
     public func stopEverything() {
+        utterance = nil
         queue.removeAll()
         runner?.cancel()
         runner = nil
@@ -1129,8 +1368,9 @@ public final class HarkEngine: ObservableObject {
         case .typeText(let text):
             guard !text.isEmpty else { return nil }  // "start typing": just a cue
             // Insert through Accessibility right away (works mid-speech); paste after release as a fallback.
+            try aboutToAct()
             if AX.insertText(text) { Log.info("Typed via Accessibility"); return nil }
-            await waitForKeysReleased()
+            try await keysReleasedForStep()
             try await Keyboard.type(text)
             Log.info("Typed via paste (after key release)")
             return nil
@@ -1140,7 +1380,7 @@ public final class HarkEngine: ObservableObject {
                 addStep(try await textEditor.apply(["op": "paste"], app: "", url: nil), status: .done)
                 return nil
             }
-            await waitForKeysReleased()
+            try await keysReleasedForStep()
             try Keyboard.press(combo)
             return nil
         case .scroll(let direction, let amount):
@@ -1260,7 +1500,7 @@ public final class HarkEngine: ObservableObject {
         let started = Date()
         // What the phrase is, decided again now that what came before it is done (SpeechIntent).
         let ctx = fieldContext() ?? SpeechIntent.Context(kind: .area, dictating: false)
-        switch SpeechIntent.classify(request, in: ctx, allowHold: false) {
+        switch modelPlans.remove(request) != nil ? .askFirst : SpeechIntent.classify(request, in: ctx, allowHold: false) {
         case .words(let text, let then):
             try await write(text, heard: request)
             if let then { enqueue(parser.plan(then), heard: then) }
@@ -1322,6 +1562,7 @@ public final class HarkEngine: ObservableObject {
         lines.append(field?.describe() ?? "[Field] none readable\n[Text] unavailable (insert, format and key still work)")
         if !recentEdits.isEmpty { lines.append("[Recent] " + recentEdits.suffix(4).joined(separator: " · ")) }
         lines.append("[Said] \(request)")
+        if let screen = await screenWords.context(newest: request, typed: written, wait: 0.5) { lines.append(screen) }
         let answer: String
         do {
             answer = try await EditorBrain.shared.ask(lines.joined(separator: "\n"))
@@ -1332,6 +1573,7 @@ public final class HarkEngine: ObservableObject {
             return try await runAgent(request)
         }
         let (ops, say) = EditorBrain.plan(from: answer)
+        try aboutToAct()  // planned while you kept talking? then the whole sentence goes instead
         Log.info("Writing plan for “\(request)”: \(answer.replacingOccurrences(of: "\n", with: " ").prefix(300))")
         // Edit steps change the text under the session: the next words start a new one.
         if !ops.isEmpty { endSession() }
@@ -1393,6 +1635,7 @@ public final class HarkEngine: ObservableObject {
 
     /// Types `words` now and has the next pass look at them.
     private func write(_ words: String, heard phrase: String) async throws {
+        try aboutToAct()
         let started = Date()
         await lockTyping()
         defer { typingBusy = false }
@@ -1437,10 +1680,12 @@ public final class HarkEngine: ObservableObject {
         let lead = String(written.prefix { $0.isWhitespace })
         let fresh = String(written.dropFirst(checked.count))
         let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-        let lines = ["[App] \(app)", "[Before] \(ns.substring(with: NSRange(location: from, length: range.location - from)))",
+        var lines = ["[App] \(app)", "[Before] \(ns.substring(with: NSRange(location: from, length: range.location - from)))",
                      "[Written] \(checked.dropFirst(min(lead.count, checked.count)))",
                      "[Just typed] \(checked.isEmpty ? String(fresh.dropFirst(lead.count)) : fresh)",
                      "[Heard]\n" + heard.suffix(12).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")]
+        // The names and terms around the field: what speech recognition gets wrong, and what they're writing about.
+        if let screen = await screenWords.context(newest: fresh, typed: seen, wait: 1) { lines.append(screen) }
         guard let answer = try? await EditorBrain.shared.ask(lines.joined(separator: "\n")), !Task.isCancelled else { return }
         // Words typed meanwhile follow the part this answer is about and stay as they are; anything else (a take-back,
         // undo, a new session) makes the answer stale.
@@ -1679,6 +1924,9 @@ public final class HarkEngine: ObservableObject {
 
     private func runAgent(_ text: String) async throws -> String {
         await settleWriting()
+        try aboutToAct()  // an edit the rest of your sentence took back never starts Claude on the fragment
+        claudeServingSpeech = heardBySpeech
+        defer { claudeServingSpeech = false }
         // Keys still held: keep listening; the island shows the steps as they happen.
         if phase != .listening { phase = .thinking }
         brainModel = .loading
@@ -2422,11 +2670,12 @@ public final class HarkEngine: ObservableObject {
     }
 
     /// Puts the engine into a display state without doing anything. For UI previews and snapshots.
-    public func preview(phase: EnginePhase, mode: ListenMode = .command, transcript: String = "", steps: [Step] = [],
+    public func preview(phase: EnginePhase, mode: ListenMode = .command, transcript: String = "", liveWords: String = "", steps: [Step] = [],
                         reply: String = "", level: Float = 0, confirmation: String? = nil) {
         self.phase = phase
         self.mode = mode
         self.transcript = transcript
+        self.liveWords = liveWords
         self.steps = steps
         self.reply = reply
         self.meter.value = level

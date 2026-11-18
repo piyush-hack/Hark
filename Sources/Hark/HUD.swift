@@ -220,9 +220,9 @@ struct HUDView: View {
                         .textCase(.uppercase)
                     // Everything you said, never cut off: long requests scroll, pinned to the newest words.
                     FittedScroll(maxHeight: 132, pinToBottom: true) {
-                        Text(headline)
+                        headlineText
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white.opacity(engine.transcript.isEmpty && engine.phase == .listening ? 0.55 : 0.96))
+                            .foregroundStyle(.white.opacity(engine.transcript.isEmpty && engine.liveWords.isEmpty && engine.phase == .listening ? 0.55 : 0.96))
                             .contentTransition(.opacity)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -327,6 +327,13 @@ struct HUDView: View {
         }
     }
 
+    /// What you said, then the phrase you're saying now, dimmer, until its real text replaces it.
+    private var headlineText: Text {
+        guard engine.confirmationPrompt == nil, !engine.liveWords.isEmpty else { return Text(headline) }
+        guard !engine.transcript.isEmpty else { return Text(engine.liveWords).foregroundColor(.white.opacity(0.62)) }
+        return Text(engine.transcript + " ") + Text(engine.liveWords).foregroundColor(.white.opacity(0.62))
+    }
+
     private var headline: String {
         if let prompt = engine.confirmationPrompt { return prompt }
         if !engine.transcript.isEmpty { return engine.transcript }
@@ -413,6 +420,8 @@ struct HUDView: View {
 
     private var pillSource: String {
         if let prompt = engine.confirmationPrompt { return prompt }
+        // While you talk, your words beat the step Hark is on.
+        if !engine.liveWords.isEmpty { return [engine.transcript, engine.liveWords].filter { !$0.isEmpty }.joined(separator: " ") }
         if engine.isBusy || [.thinking, .working].contains(engine.phase),
            let now = engine.steps.last?.title ?? (engine.transcript.isEmpty ? nil : engine.transcript) { return now }
         if !engine.transcript.isEmpty { return engine.transcript }
@@ -420,11 +429,18 @@ struct HUDView: View {
         return engine.phase == .listening ? "Listening" : statusLabel
     }
 
+    /// The end of a long line from its first whole word, so it never starts mid-word.
+    static func wholeWords(_ tail: Substring) -> String {
+        let start = tail.firstIndex(of: " ").map { tail.index(after: $0) } ?? tail.startIndex
+        return String(tail[start...]).trimmingCharacters(in: .whitespaces)
+    }
+
     /// Minimized: the orb (it shows listening and thinking) and what Hark is doing.
     private var pill: some View {
         HStack(spacing: 8) {
             LiveOrb(meter: engine.meter, mood: engine.phase.mood, size: 22)
-            Text(pillText.count > 46 ? pillText.prefix(45).trimmingCharacters(in: .whitespaces) + "…" : pillText)
+            // Long text keeps its newest words: what you just said, or the end of the step.
+            Text(pillText.count > 46 ? "…" + Self.wholeWords(pillText.suffix(45)) : pillText)
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
